@@ -27,3 +27,5 @@ def get_db():
         yield db
     finally:
         db.close()
+
+from app.database.models import User, Task, Team, Meeting, Evaluation

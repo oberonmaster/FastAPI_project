@@ -64,6 +64,7 @@ class Evaluation(Base):
     """main info"""
     __tablename__ = "evalutions"
     id = Column(Integer, primary_key=True, index=True)
+    name = Column(String)
     # Fields
     evaluation_name = Column(String)
     # Relations
