@@ -1,82 +1,100 @@
 """ Модели данных для заполнения базы """
 
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, DateTime
 from app.database.database import Base
+from datetime import datetime, timezone
 
 
 class User(Base):
     """main info"""
     __tablename__ = "users"
-    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer,
+                     primary_key=True,
+                     index=True,
+                     unique=True)
 
     # Fields
-    username = Column(String, unique=True, index=True)
-    email = Column(String, unique=True, index=True)
-    password = Column(String)
-
-class Team(Base):
-    """main info"""
-    __tablename__ = "teams"
-    id = Column(Integer, primary_key=True, index=True)
-
-    # Fields
-    team_name = Column(String, unique=True, index=True)
+    username = Column(String,
+                      unique=True,
+                      index=True)
+    email = Column(String,
+                   unique=True,
+                   index=True)
+    hashed_password = Column(String,
+                             nullable=False)
+    is_active = Column(Boolean,
+                       default=True)
+    is_superuser = Column(Boolean,
+                          default=False)
+    is_verified = Column(Boolean,
+                         default=False)
+    created_at = Column(DateTime,
+                        default=lambda: datetime.now(timezone.utc))
 
     # Relations
-    """one to one """
+    member_of_team = Column(Integer,
+                            ForeignKey("teams.team_id"),
+                            nullable=True)
 
-    """one to many"""
-    # team_admin =
-    # team_member =
-
-    """many to many"""
 
 class Task(Base):
     """main info"""
     __tablename__ = "tasks"
-    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer,
+                     primary_key=True,
+                     index=True,
+                     unique=True)
 
     # Fields
     task_name = Column(String)
 
     # Relations
-    """one to one """
-    # task_executor
+    task_executor = Column(Integer,
+                           ForeignKey("users.user_id"))
 
-    """one to many"""
 
-    """many to many"""
+class Team(Base):
+    """main info"""
+    __tablename__ = "teams"
+    team_id = Column(Integer,
+                     primary_key=True,
+                     index=True,
+                     unique=True)
+
+    # Fields
+    team_name = Column(String,
+                       unique=True,
+                       index=True)
+
+    # Relations
+    team_admin = Column(Integer,
+                        ForeignKey("users.user_id"))
+
 
 class Meeting(Base):
     """main info"""
     __tablename__ = "meetings"
-    id = Column(Integer, primary_key=True, index=True)
+    meeting_id = Column(Integer,
+                        primary_key=True,
+                        index=True,
+                        unique=True)
+
     # Fields
     meeting_name = Column(String)
-    # Relations
-    """one to one """
 
-    """one to many"""
-
-    """many to many"""
 
 class Evaluation(Base):
     """main info"""
-    __tablename__ = "evalutions"
-    id = Column(Integer, primary_key=True, index=True)
+    __tablename__ = "evaluations"
+    evaluation_id = Column(Integer,
+                           primary_key=True,
+                           index=True,
+                           unique=True)
     name = Column(String)
+
     # Fields
-    evaluation_name = Column(String)
+    evaluation_value = Column(Integer)
+
     # Relations
-    """one to one """
-
-    """one to many"""
-
-    """many to many"""
-
-
-
-
-
-
-
+    task_rating = Column(Integer,
+                         ForeignKey("tasks.task_id"))
