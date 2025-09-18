@@ -25,7 +25,7 @@ class SimpleAuth(AuthenticationBackend):
 
 """Регистрируем модели"""
 class UserAdmin(ModelView, model=User):
-    column_list = [User.user_id,
+    column_list = [User.id,
                    User.username,
                    User.email,
                    User.is_active,
@@ -34,7 +34,9 @@ class UserAdmin(ModelView, model=User):
                    User.created_at,
                    User.member_of_team]
     column_searchable_list = [User.username, User.email]
-    column_sortable_list = [User.user_id, User.username]
+    column_sortable_list = [User.id, User.username]
+
+
 
 
 class TeamAdmin(ModelView, model=Team):

@@ -1,6 +1,6 @@
 """ Модели данных для заполнения базы """
 
-from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, DateTime, TIMESTAMP, func
 from app.database.database import Base
 from datetime import datetime, timezone
 
@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 class User(Base):
     """main info"""
     __tablename__ = "users"
-    user_id = Column(Integer,
+    id = Column(Integer,
                      primary_key=True,
                      index=True,
                      unique=True)
@@ -28,8 +28,7 @@ class User(Base):
                           default=False)
     is_verified = Column(Boolean,
                          default=False)
-    created_at = Column(DateTime,
-                        default=lambda: datetime.now(timezone.utc))
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
     # Relations
     member_of_team = Column(Integer,
@@ -50,7 +49,7 @@ class Task(Base):
 
     # Relations
     task_executor = Column(Integer,
-                           ForeignKey("users.user_id"))
+                           ForeignKey("users.id"))
 
 
 class Team(Base):
@@ -68,7 +67,7 @@ class Team(Base):
 
     # Relations
     team_admin = Column(Integer,
-                        ForeignKey("users.user_id"))
+                        ForeignKey("users.id"))
 
 
 class Meeting(Base):
