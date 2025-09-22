@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base, sessionmaker
 from typing import AsyncGenerator
+from contextlib import asynccontextmanager
 
 load_dotenv()
 DB_USER = os.getenv("DB_USER")
@@ -26,12 +27,12 @@ async_session_maker = sessionmaker(engine,
                                    class_=AsyncSession,
                                    expire_on_commit=False)
 
+@asynccontextmanager
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     async with async_session_maker() as session:
         yield session
 
 async def create_db_and_tables():
-    # создаст все таблицы, определённые в Base.metadata
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
