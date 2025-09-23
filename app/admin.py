@@ -3,7 +3,11 @@ from sqladmin import ModelView
 from sqladmin.authentication import AuthenticationBackend
 from app.database.models import User, Team, Task, Meeting
 from starlette.requests import Request
+from markupsafe import Markup
+from fastapi_users.password import PasswordHelper
 
+
+password_helper = PasswordHelper()
 
 """ аутентификация """
 class SimpleAuth(AuthenticationBackend):
@@ -25,25 +29,66 @@ class SimpleAuth(AuthenticationBackend):
 
 """Регистрируем модели"""
 class UserAdmin(ModelView, model=User):
-    column_list = [User.id,
-                   User.username,
-                   User.email,
-                   User.is_active,
-                   User.is_superuser,
-                   User.is_verified,
-                   User.created_at,
-                   User.member_of_team]
+    column_list = [
+        User.id,
+        User.username,
+        User.email,
+        User.is_active,
+        User.is_superuser,
+        User.is_verified,
+        User.created_at,
+        User.member_of_team,
+    ]
+
     column_searchable_list = [User.username, User.email]
     column_sortable_list = [User.id, User.username]
 
-
+    form_columns = [
+        User.username,
+        User.email,
+        User.hashed_password,
+        User.is_active,
+        User.is_superuser,
+        User.is_verified,
+        User.member_of_team,
+    ]
 
 
 class TeamAdmin(ModelView, model=Team):
-    column_list = [Team.team_id,
-                   Team.team_name,
-                   Team.team_admin,
-                   ]
+    column_list = [
+        Team.team_id,
+        Team.team_name,
+        "admin_username",   # виртуальная колонка
+        "members_list",     # виртуальная колонка
+    ]
+
+    form_columns = [
+        Team.team_name,
+        Team.admin,     # отношение — sqladmin должен показать select пользователей
+        Team.members,   # множественный выбор участников
+    ]
+
+    @staticmethod
+    def fmt_admin_username(obj, prop):
+        try:
+            return obj.admin.username if obj.admin else ""
+        except Exception:
+            return ""
+
+    @staticmethod
+    def fmt_members_list(obj, prop):
+        try:
+            members = obj.members or []
+            names = [m.username or str(m.id) for m in members]
+            # вернуть HTML с переносами строк
+            return Markup("<br>".join(names))
+        except Exception:
+            return ""
+
+    column_formatters = {
+        "admin_username": fmt_admin_username,
+        "members_list": fmt_members_list,
+    }
 
 
 class TaskAdmin(ModelView, model=Task):

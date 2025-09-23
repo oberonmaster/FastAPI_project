@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from starlette.middleware.sessions import SessionMiddleware
 from sqladmin import Admin
-from app.database.database import engine, create_db_and_tables, get_async_session
+from app.database.database import engine, create_db_and_tables, get_async_session, async_session_maker
 from app.database.models import User
 from app.users import fastapi_users, auth_backend
 from app.schemas import UserRead, UserCreate, UserUpdate
@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI):
     admin.add_view(MeetingAdmin)
 
     if ADMIN_EMAIL and ADMIN_PASSWORD:
-        async with get_async_session() as session:  # returns AsyncSession
+        async with async_session_maker() as session:  # returns AsyncSession
             user_db = SQLAlchemyUserDatabase(session, User)
 
             existing = await user_db.get_by_email(ADMIN_EMAIL)

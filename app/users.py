@@ -1,4 +1,3 @@
-
 import secrets
 from typing import Optional
 from fastapi import Depends, Request
@@ -10,7 +9,7 @@ from app.database.users_database import get_user_db
 from app.database.models import User
 from app.schemas import UserRead, UserCreate, UserUpdate
 
-SECRET = "CHANGE_THIS_TO_A_SECURE_VALUE"  # положи в env в проде
+SECRET = "CHANGE_THIS_TO_A_SECURE_VALUE"
 
 class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
     reset_password_token_secret = SECRET
