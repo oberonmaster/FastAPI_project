@@ -7,17 +7,11 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from starlette.middleware.sessions import SessionMiddleware
 from sqladmin import Admin
-from app.database.database import engine, create_db_and_tables, get_async_session, async_session_maker
+from app.database.database import engine, create_db_and_tables, async_session_maker
 from app.database.models import User
 from app.users import fastapi_users, auth_backend
 from app.schemas import UserRead, UserCreate, UserUpdate
-from app.admin import (SimpleAuth,
-                       UserAdmin,
-                       TeamAdmin,
-                       TaskAdmin,
-                       MeetingAdmin)
-
-
+from app.admin import SimpleAuth, UserAdmin, TeamAdmin, TaskAdmin, MeetingAdmin
 from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 from fastapi_users.password import PasswordHelper
 
@@ -33,17 +27,14 @@ password_helper = PasswordHelper()
 async def lifespan(app: FastAPI):
     await create_db_and_tables()
 
-    admin = Admin(app=app,
-                  engine=engine,
-                  authentication_backend=SimpleAuth(SECRET_KEY),
-                  base_url="/admin")
+    admin = Admin(app=app, engine=engine, authentication_backend=SimpleAuth(SECRET_KEY), base_url="/admin")
     admin.add_view(UserAdmin)
     admin.add_view(TeamAdmin)
     admin.add_view(TaskAdmin)
     admin.add_view(MeetingAdmin)
 
     if ADMIN_EMAIL and ADMIN_PASSWORD:
-        async with async_session_maker() as session:  # returns AsyncSession
+        async with async_session_maker() as session:
             user_db = SQLAlchemyUserDatabase(session, User)
 
             existing = await user_db.get_by_email(ADMIN_EMAIL)
@@ -69,25 +60,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="My FastAPI App", lifespan=lifespan)
 
-
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
-
-app.include_router(
-    fastapi_users.get_auth_router(auth_backend), prefix="/auth/jwt", tags=["auth"]
-)
-app.include_router(
-    fastapi_users.get_register_router(UserRead, UserCreate), prefix="/auth", tags=["auth"]
-)
-app.include_router(
-    fastapi_users.get_reset_password_router(), prefix="/auth", tags=["auth"]
-)
-app.include_router(
-    fastapi_users.get_verify_router(UserRead), prefix="/auth", tags=["auth"]
-)
-app.include_router(
-    fastapi_users.get_users_router(UserRead, UserUpdate), prefix="/users", tags=["users"]
-)
+app.include_router(fastapi_users.get_auth_router(auth_backend), prefix="/auth/jwt", tags=["auth"])
+app.include_router(fastapi_users.get_register_router(UserRead, UserCreate), prefix="/auth", tags=["auth"])
+app.include_router(fastapi_users.get_reset_password_router(), prefix="/auth", tags=["auth"])
+app.include_router(fastapi_users.get_verify_router(UserRead), prefix="/auth", tags=["auth"])
+app.include_router(fastapi_users.get_users_router(UserRead, UserUpdate), prefix="/users", tags=["users"])
 
 
 def main():

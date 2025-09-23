@@ -40,8 +40,15 @@ class UserAdmin(ModelView, model=User):
         User.member_of_team,
     ]
 
-    column_searchable_list = [User.username, User.email]
-    column_sortable_list = [User.id, User.username]
+    column_searchable_list = [
+        User.username,
+        User.email
+    ]
+
+    column_sortable_list = [
+        User.id,
+        User.username
+    ]
 
     form_columns = [
         User.username,
@@ -58,46 +65,25 @@ class TeamAdmin(ModelView, model=Team):
     column_list = [
         Team.team_id,
         Team.team_name,
-        "admin_username",   # виртуальная колонка
-        "members_list",     # виртуальная колонка
+        Team.admin,
+        Team.members,
     ]
-
-    form_columns = [
-        Team.team_name,
-        Team.admin,     # отношение — sqladmin должен показать select пользователей
-        Team.members,   # множественный выбор участников
-    ]
-
-    @staticmethod
-    def fmt_admin_username(obj, prop):
-        try:
-            return obj.admin.username if obj.admin else ""
-        except Exception:
-            return ""
-
-    @staticmethod
-    def fmt_members_list(obj, prop):
-        try:
-            members = obj.members or []
-            names = [m.username or str(m.id) for m in members]
-            # вернуть HTML с переносами строк
-            return Markup("<br>".join(names))
-        except Exception:
-            return ""
-
-    column_formatters = {
-        "admin_username": fmt_admin_username,
-        "members_list": fmt_members_list,
-    }
 
 
 class TaskAdmin(ModelView, model=Task):
-    column_list = [Task.task_id,
-                   Task.task_name,
-                   Task.task_executor,
-                   ]
+    column_list = [
+        Task.task_id,
+        Task.task_name,
+        Task.task_executor,
+        Task.task_checker,
+        Task.evaluations
+    ]
+
 
 class MeetingAdmin(ModelView, model=Meeting):
-    column_list = [Meeting.meeting_id,
-                   Meeting.meeting_name,
-                   ]
+    column_list = [
+        Meeting.meeting_id,
+        Meeting.meeting_name,
+        Meeting.meeting_admin,
+        Meeting.meeting_date,
+    ]

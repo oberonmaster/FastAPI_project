@@ -5,7 +5,7 @@ from fastapi_users import BaseUserManager, FastAPIUsers, IntegerIDMixin
 from fastapi_users.db import SQLAlchemyUserDatabase
 from fastapi_users.authentication import AuthenticationBackend, BearerTransport, JWTStrategy
 
-from app.database.users_database import get_user_db
+from app.database.database import get_user_db
 from app.database.models import User
 from app.schemas import UserRead, UserCreate, UserUpdate
 

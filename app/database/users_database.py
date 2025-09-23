@@ -4,6 +4,4 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.database import get_async_session
 from app.database.models import User
 
-async def get_user_db():
-    async with get_async_session() as session:
-        yield SQLAlchemyUserDatabase(session, User)
+

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base, sessionmaker
 from typing import AsyncGenerator
 from contextlib import asynccontextmanager
+from fastapi_users.db import SQLAlchemyUserDatabase
 
 load_dotenv()
 DB_USER = os.getenv("DB_USER")
@@ -23,9 +24,7 @@ engine = create_async_engine(DATABASE_URL,
                              future=True,
                              echo=False)
 
-async_session_maker = sessionmaker(engine,
-                                   class_=AsyncSession,
-                                   expire_on_commit=False)
+async_session_maker = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 @asynccontextmanager
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
@@ -35,5 +34,11 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
 async def create_db_and_tables():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+
+async def get_user_db():
+    async with get_async_session() as session:
+        yield SQLAlchemyUserDatabase(session, User)
+
 
 from app.database.models import User, Task, Team, Meeting, Evaluation
