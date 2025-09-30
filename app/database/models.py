@@ -1,11 +1,14 @@
 """ Модели данных для заполнения базы """
 from sqlalchemy import Table, Column, Integer, String, ForeignKey, Boolean, TIMESTAMP, func, CheckConstraint
 from app.database.database import Base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, synonym
+from fastapi_users.password import PasswordHelper
+
 
 
 meeting_participants = Table("meeting_participants", Base.metadata,Column("meeting_id", Integer,ForeignKey("meetings.meeting_id", ondelete="CASCADE"), primary_key=True), Column("user_id", Integer,ForeignKey("users.id", ondelete="CASCADE"), primary_key=True))
 
+_password_helper = PasswordHelper()
 
 class User(Base):
     """main info"""
@@ -32,6 +35,16 @@ class User(Base):
 
     def __str__(self):
         return self.username
+
+    def _get_password(self) -> str:
+        return ""
+
+    def _set_password(self, raw_password: str) -> None:
+        if not raw_password:
+            return
+        self.hashed_password = _password_helper.hash(raw_password)
+
+    password = synonym("hashed_password", descriptor=property(_get_password, _set_password))
 
 
 class Task(Base):

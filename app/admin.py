@@ -3,8 +3,9 @@ from sqladmin import ModelView
 from sqladmin.authentication import AuthenticationBackend
 from app.database.models import User, Team, Task, Meeting
 from starlette.requests import Request
-from markupsafe import Markup
 from fastapi_users.password import PasswordHelper
+from wtforms import PasswordField
+from fastapi import HTTPException
 
 
 password_helper = PasswordHelper()
@@ -53,12 +54,38 @@ class UserAdmin(ModelView, model=User):
     form_columns = [
         User.username,
         User.email,
-        User.hashed_password,
+        "password",
         User.is_active,
         User.is_superuser,
         User.is_verified,
         User.member_of_team,
     ]
+
+    async def scaffold_form(self, *args, **kwargs):
+        FormClass = await super().scaffold_form(*args, **kwargs)
+        if not hasattr(FormClass, "password"):
+            setattr(FormClass, "password", PasswordField("Password", render_kw={"class": "form-control", "id": "password"}))
+        return FormClass
+
+
+    async def insert_model(self, request: Request, data: dict):
+        pw = None
+        if "password" in data:
+            pw = data.pop("password")
+        if not pw:
+            raise HTTPException(status_code=400, detail="Password is required when creating a user via admin.")
+        data["hashed_password"] = password_helper.hash(pw)
+        return await super().insert_model(request, data)
+
+    async def update_model(self, request: Request, obj, data: dict):
+        if "password" in data:
+            pw = data.pop("password")
+            if pw:
+                data["hashed_password"] = password_helper.hash(pw)
+            else:
+                data.pop("hashed_password", None)
+
+        return await super().update_model(request, obj, data)
 
 
 class TeamAdmin(ModelView, model=Team):
