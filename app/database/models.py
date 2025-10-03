@@ -1,14 +1,32 @@
 """ Модели данных для заполнения базы """
-from sqlalchemy import Table, Column, Integer, String, ForeignKey, Boolean, TIMESTAMP, func, CheckConstraint
+from sqlalchemy import (Table,
+                        Column,
+                        Integer,
+                        String,
+                        ForeignKey,
+                        Boolean,
+                        TIMESTAMP,
+                        func,
+                        CheckConstraint,
+                        Enum,
+                        UniqueConstraint)
 from app.database.database import Base
 from sqlalchemy.orm import relationship, synonym
 from fastapi_users.password import PasswordHelper
-
+import enum
 
 
 meeting_participants = Table("meeting_participants", Base.metadata,Column("meeting_id", Integer,ForeignKey("meetings.meeting_id", ondelete="CASCADE"), primary_key=True), Column("user_id", Integer,ForeignKey("users.id", ondelete="CASCADE"), primary_key=True))
 
 _password_helper = PasswordHelper()
+
+
+class RoleEnum(str, enum.Enum):
+    user = "user"
+    manager = "manager"
+    team_admin = "team_admin"
+    admin = "admin"
+
 
 class User(Base):
     """main info"""
@@ -22,6 +40,7 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     is_superuser = Column(Boolean, default=False)
     is_verified = Column(Boolean, default=False)
+    role = Column(Enum(RoleEnum), default=RoleEnum.user, nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
     # Relations
@@ -99,12 +118,14 @@ class Meeting(Base):
 class Evaluation(Base):
     __tablename__ = "evaluations"
     evaluation_id = Column(Integer, primary_key=True, index=True, unique=True)
-    name = Column(String)
-
-    # Fields
+    evaluation_name = Column(String, nullable=True)
     evaluation_value = Column(Integer, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
-    __table_args__ = (CheckConstraint("evaluation_value >= 1 AND evaluation_value <= 5", name="ck_evaluation_value_range"),)
+    __table_args__ = (
+        CheckConstraint("evaluation_value >= 1 AND evaluation_value <= 5", name="ck_evaluation_value_range"),
+        UniqueConstraint("task_id", "evaluator_id", name="uq_task_evaluator"),
+    )
 
     # Relations
     task_id = Column(Integer, ForeignKey("tasks.task_id", ondelete="CASCADE"), nullable=False)

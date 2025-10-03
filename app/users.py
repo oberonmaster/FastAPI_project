@@ -1,13 +1,11 @@
-import secrets
 from typing import Optional
 from fastapi import Depends, Request
 from fastapi_users import BaseUserManager, FastAPIUsers, IntegerIDMixin
-from fastapi_users.db import SQLAlchemyUserDatabase
 from fastapi_users.authentication import AuthenticationBackend, BearerTransport, JWTStrategy
 
 from app.database.database import get_user_db
 from app.database.models import User
-from app.schemas import UserRead, UserCreate, UserUpdate
+
 
 SECRET = "CHANGE_THIS_TO_A_SECURE_VALUE"
 

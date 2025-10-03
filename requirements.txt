@@ -1,3 +1,4 @@
+fastapi-users-db-sqlalchemy
 httpx
 aiofiles==24.1.0
 aioredis==2.0.1

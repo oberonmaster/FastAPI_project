@@ -1,12 +1,12 @@
 import os
 from sqladmin import ModelView
 from sqladmin.authentication import AuthenticationBackend
-from app.database.models import User, Team, Task, Meeting
+from app.database.models import User, Team, Task, Meeting, Evaluation
 from starlette.requests import Request
 from fastapi_users.password import PasswordHelper
 from wtforms import PasswordField
 from fastapi import HTTPException
-
+from wtforms import SelectField
 
 password_helper = PasswordHelper()
 
@@ -37,8 +37,10 @@ class UserAdmin(ModelView, model=User):
         User.is_active,
         User.is_superuser,
         User.is_verified,
-        User.created_at,
+        User.role,
         User.member_of_team,
+
+        User.created_at,
     ]
 
     column_searchable_list = [
@@ -60,6 +62,12 @@ class UserAdmin(ModelView, model=User):
         User.is_verified,
         User.member_of_team,
     ]
+
+    column_formatters = {
+        User.created_at: lambda m, a: (
+            m.created_at.strftime("%Y-%m-%d %H:%M:%S.%f")[:-4] if m.created_at else None
+        )
+    }
 
     async def scaffold_form(self, *args, **kwargs):
         FormClass = await super().scaffold_form(*args, **kwargs)
@@ -101,10 +109,22 @@ class TaskAdmin(ModelView, model=Task):
     column_list = [
         Task.task_id,
         Task.task_name,
-        Task.task_executor,
-        Task.task_checker,
+        Task.executor,
+        Task.checker,
         Task.evaluations
     ]
+
+    column_formatters = {
+        Task.executor: lambda obj, request: obj.executor.username if obj.executor else "—",
+        Task.checker: lambda obj, request: obj.checker.username if obj.checker else "—",
+        Task.evaluations: lambda obj, request: ", ".join(
+            f"{ev.evaluation_value} (by {ev.evaluator.username if ev.evaluator else '—'})"
+            for ev in (obj.evaluations or [])
+        )
+    }
+
+    column_searchable_list = [Task.task_name]
+    column_sortable_list = [Task.task_id, Task.task_name]
 
 
 class MeetingAdmin(ModelView, model=Meeting):
@@ -114,3 +134,21 @@ class MeetingAdmin(ModelView, model=Meeting):
         Meeting.meeting_admin,
         Meeting.meeting_date,
     ]
+
+class EvaluationAdmin(ModelView, model=Evaluation):
+    column_list = [
+        Evaluation.evaluation_id,
+        Evaluation.evaluation_value,
+        Evaluation.task,
+        Evaluation.evaluator,
+        Evaluation.created_at
+    ]
+
+    column_formatters = {
+        Evaluation.task: lambda obj, request: obj.task.task_name if obj.task else "—",
+        Evaluation.evaluator: lambda obj, request: obj.evaluator.username if obj.evaluator else "—"
+    }
+
+    column_searchable_list = [Evaluation.evaluation_value]
+    column_sortable_list = [Evaluation.evaluation_id, Evaluation.evaluation_value, Evaluation.created_at]
+
