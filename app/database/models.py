@@ -9,14 +9,20 @@ from sqlalchemy import (Table,
                         func,
                         CheckConstraint,
                         Enum,
-                        UniqueConstraint)
+                        UniqueConstraint,
+                        Text)
 from app.database.database import Base
 from sqlalchemy.orm import relationship, synonym
 from fastapi_users.password import PasswordHelper
 import enum
 
 
-meeting_participants = Table("meeting_participants", Base.metadata,Column("meeting_id", Integer,ForeignKey("meetings.meeting_id", ondelete="CASCADE"), primary_key=True), Column("user_id", Integer,ForeignKey("users.id", ondelete="CASCADE"), primary_key=True))
+meeting_participants = Table(
+    "meeting_participants",
+    Base.metadata,
+    Column("meeting_id", Integer, ForeignKey("meetings.meeting_id", ondelete="CASCADE"), primary_key=True),
+    Column("user_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+)
 
 _password_helper = PasswordHelper()
 
@@ -26,6 +32,12 @@ class RoleEnum(str, enum.Enum):
     manager = "manager"
     team_admin = "team_admin"
     admin = "admin"
+
+
+class TaskStatusEnum(str, enum.Enum):
+    open = "open"
+    in_progress = "in_progress"
+    completed = "completed"
 
 
 class User(Base):
@@ -47,10 +59,11 @@ class User(Base):
     member_of_team = Column(Integer, ForeignKey("teams.team_id"), nullable=True)
     team = relationship("Team", back_populates="members", foreign_keys=[member_of_team], lazy="joined")
     admin_of = relationship("Team", back_populates="admin", uselist=False, foreign_keys="Team.team_admin", lazy="selectin")
-    tasks_assigned = relationship( "Task", back_populates="executor", foreign_keys="Task.task_executor", lazy="selectin")
+    tasks_assigned = relationship("Task", back_populates="executor", foreign_keys="Task.task_executor", lazy="selectin")
     tasks_checked = relationship("Task", back_populates="checker", foreign_keys="Task.task_checker", lazy="selectin")
     evaluations_given = relationship("Evaluation", back_populates="evaluator", foreign_keys="Evaluation.evaluator_id", lazy="selectin")
     meetings = relationship("Meeting", secondary=meeting_participants, back_populates="participants", lazy="selectin")
+    comments_written = relationship("Comment", back_populates="author", lazy="selectin")
 
     def __str__(self):
         return self.username
@@ -72,13 +85,20 @@ class Task(Base):
 
     # Fields
     task_name = Column(String, nullable=False)
+    task_description = Column(Text, nullable=True)
+    status = Column(Enum(TaskStatusEnum), default=TaskStatusEnum.open, nullable=False)
+    deadline = Column(TIMESTAMP(timezone=True), nullable=True)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
     # Relations
     task_executor = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     task_checker = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    team_id = Column(Integer, ForeignKey("teams.team_id"), nullable=True)
     executor = relationship("User", back_populates="tasks_assigned", foreign_keys=[task_executor], lazy="joined")
     checker = relationship("User", back_populates="tasks_checked", foreign_keys=[task_checker], lazy="joined")
+    team = relationship("Team", back_populates="tasks", lazy="joined")
     evaluations = relationship("Evaluation", back_populates="task", cascade="all, delete-orphan", lazy="selectin")
+    comments = relationship("Comment", back_populates="task", cascade="all, delete-orphan", lazy="selectin")
 
     def average_rating(self):
         """Вычисляем среднюю оценку (None если оценок нет)."""
@@ -94,11 +114,14 @@ class Team(Base):
 
     # Fields
     team_name = Column(String, unique=True, index=True)
+    invite_code = Column(String, unique=True, nullable=True)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
     # Relations
     team_admin = Column(Integer, ForeignKey("users.id"), nullable=True)
     admin = relationship("User", back_populates="admin_of", foreign_keys=[team_admin], uselist=False, lazy="joined")
     members = relationship("User", back_populates="team", foreign_keys="User.member_of_team", lazy="selectin", cascade="all, delete-orphan")
+    tasks = relationship("Task", back_populates="team", lazy="selectin")
 
 
 class Meeting(Base):
@@ -107,7 +130,10 @@ class Meeting(Base):
 
     # Fields
     meeting_name = Column(String, nullable=False)
-    meeting_date = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
+    meeting_description = Column(Text, nullable=True)
+    meeting_date = Column(TIMESTAMP(timezone=True), nullable=False)
+    duration_minutes = Column(Integer, default=60)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
     # Relations
     meeting_admin = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
@@ -120,6 +146,7 @@ class Evaluation(Base):
     evaluation_id = Column(Integer, primary_key=True, index=True, unique=True)
     evaluation_name = Column(String, nullable=True)
     evaluation_value = Column(Integer, nullable=False)
+    evaluation_comment = Column(Text, nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
     __table_args__ = (
@@ -133,3 +160,15 @@ class Evaluation(Base):
     task = relationship("Task", back_populates="evaluations", foreign_keys=[task_id], lazy="joined")
     evaluator = relationship("User", back_populates="evaluations_given", foreign_keys=[evaluator_id], lazy="joined")
 
+
+class Comment(Base):
+    __tablename__ = "comments"
+    comment_id = Column(Integer, primary_key=True, index=True, unique=True)
+    content = Column(Text, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
+
+    # Relations
+    task_id = Column(Integer, ForeignKey("tasks.task_id", ondelete="CASCADE"), nullable=False)
+    author_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    task = relationship("Task", back_populates="comments", foreign_keys=[task_id], lazy="joined")
+    author = relationship("User", back_populates="comments_written", foreign_keys=[author_id], lazy="joined")

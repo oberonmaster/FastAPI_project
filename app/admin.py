@@ -1,12 +1,12 @@
 import os
 from sqladmin import ModelView
 from sqladmin.authentication import AuthenticationBackend
-from app.database.models import User, Team, Task, Meeting, Evaluation
+from app.database.models import User, Team, Task, Meeting, Evaluation, Comment
 from starlette.requests import Request
 from fastapi_users.password import PasswordHelper
 from wtforms import PasswordField
 from fastapi import HTTPException
-from wtforms import SelectField
+
 
 password_helper = PasswordHelper()
 
@@ -39,7 +39,6 @@ class UserAdmin(ModelView, model=User):
         User.is_verified,
         User.role,
         User.member_of_team,
-
         User.created_at,
     ]
 
@@ -60,12 +59,13 @@ class UserAdmin(ModelView, model=User):
         User.is_active,
         User.is_superuser,
         User.is_verified,
+        User.role,
         User.member_of_team,
     ]
 
     column_formatters = {
         User.created_at: lambda m, a: (
-            m.created_at.strftime("%Y-%m-%d %H:%M:%S.%f")[:-4] if m.created_at else None
+            m.created_at.strftime("%Y-%m-%d %H:%M:%S") if m.created_at else None
         )
     }
 
@@ -74,7 +74,6 @@ class UserAdmin(ModelView, model=User):
         if not hasattr(FormClass, "password"):
             setattr(FormClass, "password", PasswordField("Password", render_kw={"class": "form-control", "id": "password"}))
         return FormClass
-
 
     async def insert_model(self, request: Request, data: dict):
         pw = None
@@ -102,21 +101,36 @@ class TeamAdmin(ModelView, model=Team):
         Team.team_name,
         Team.admin,
         Team.members,
+        Team.invite_code,
+        Team.created_at,
     ]
+
+    column_formatters = {
+        Team.created_at: lambda m, a: (
+            m.created_at.strftime("%Y-%m-%d %H:%M:%S") if m.created_at else None
+        )
+    }
 
 
 class TaskAdmin(ModelView, model=Task):
     column_list = [
         Task.task_id,
         Task.task_name,
+        Task.status,
         Task.executor,
         Task.checker,
+        Task.team,
+        Task.deadline,
         Task.evaluations
     ]
 
     column_formatters = {
         Task.executor: lambda obj, request: obj.executor.username if obj.executor else "—",
         Task.checker: lambda obj, request: obj.checker.username if obj.checker else "—",
+        Task.team: lambda obj, request: obj.team.team_name if obj.team else "—",
+        Task.deadline: lambda m, a: (
+            m.deadline.strftime("%Y-%m-%d %H:%M:%S") if m.deadline else None
+        ),
         Task.evaluations: lambda obj, request: ", ".join(
             f"{ev.evaluation_value} (by {ev.evaluator.username if ev.evaluator else '—'})"
             for ev in (obj.evaluations or [])
@@ -133,7 +147,16 @@ class MeetingAdmin(ModelView, model=Meeting):
         Meeting.meeting_name,
         Meeting.meeting_admin,
         Meeting.meeting_date,
+        Meeting.duration_minutes,
     ]
+
+    column_formatters = {
+        Meeting.meeting_date: lambda m, a: (
+            m.meeting_date.strftime("%Y-%m-%d %H:%M:%S") if m.meeting_date else None
+        ),
+        Meeting.admin: lambda obj, request: obj.admin.username if obj.admin else "—"
+    }
+
 
 class EvaluationAdmin(ModelView, model=Evaluation):
     column_list = [
@@ -146,9 +169,29 @@ class EvaluationAdmin(ModelView, model=Evaluation):
 
     column_formatters = {
         Evaluation.task: lambda obj, request: obj.task.task_name if obj.task else "—",
-        Evaluation.evaluator: lambda obj, request: obj.evaluator.username if obj.evaluator else "—"
+        Evaluation.evaluator: lambda obj, request: obj.evaluator.username if obj.evaluator else "—",
+        Evaluation.created_at: lambda m, a: (
+            m.created_at.strftime("%Y-%m-%d %H:%M:%S") if m.created_at else None
+        )
     }
 
     column_searchable_list = [Evaluation.evaluation_value]
     column_sortable_list = [Evaluation.evaluation_id, Evaluation.evaluation_value, Evaluation.created_at]
 
+
+class CommentAdmin(ModelView, model=Comment):
+    column_list = [
+        Comment.comment_id,
+        Comment.content,
+        Comment.task,
+        Comment.author,
+        Comment.created_at
+    ]
+
+    column_formatters = {
+        Comment.task: lambda obj, request: obj.task.task_name if obj.task else "—",
+        Comment.author: lambda obj, request: obj.author.username if obj.author else "—",
+        Comment.created_at: lambda m, a: (
+            m.created_at.strftime("%Y-%m-%d %H:%M:%S") if m.created_at else None
+        )
+    }
