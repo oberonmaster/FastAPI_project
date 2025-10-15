@@ -1,3 +1,4 @@
+"""Dependencies"""
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.database import get_async_session
@@ -6,6 +7,7 @@ from app.users import current_active_user
 
 
 async def get_admin_user(current_user: User = Depends(current_active_user)):
+    """getting admin user"""
     if current_user.role != RoleEnum.admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -15,6 +17,7 @@ async def get_admin_user(current_user: User = Depends(current_active_user)):
 
 
 async def get_manager_user(current_user: User = Depends(current_active_user)):
+    """getting manager user"""
     if current_user.role not in [RoleEnum.admin, RoleEnum.team_admin, RoleEnum.manager]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -24,6 +27,7 @@ async def get_manager_user(current_user: User = Depends(current_active_user)):
 
 
 async def get_team_admin_user(current_user: User = Depends(current_active_user)):
+    """getting team admin user"""
     if current_user.role not in [RoleEnum.admin, RoleEnum.team_admin]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -37,6 +41,7 @@ async def verify_team_member(
         current_user: User = Depends(current_active_user),
         db: AsyncSession = Depends(get_async_session)
 ):
+    """Verification of team member"""
 
     if current_user.role in [RoleEnum.admin]:
         return current_user

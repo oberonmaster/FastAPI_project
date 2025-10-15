@@ -2,12 +2,14 @@
 Основной скрипт создания и запуска приложения + админ
 """
 import os
+from contextlib import asynccontextmanager
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI
-from contextlib import asynccontextmanager
 from starlette.middleware.sessions import SessionMiddleware
 from sqladmin import Admin
+from sqlalchemy import select
+from fastapi_users.password import PasswordHelper
 from app.database.database import engine, create_db_and_tables, async_session_maker
 from app.database.models import User
 from app.users import fastapi_users, auth_backend
@@ -23,10 +25,16 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(application: FastAPI):
+    """Initial lifespan"""
     await create_db_and_tables()
 
-    admin = Admin(app=app, engine=engine, authentication_backend=SimpleAuth(SECRET_KEY), base_url="/admin")
+    admin = Admin(
+        app=application,
+        engine=engine,
+        authentication_backend=SimpleAuth(SECRET_KEY),
+        base_url="/admin"
+    )
     admin.add_view(UserAdmin)
     admin.add_view(TeamAdmin)
     admin.add_view(TaskAdmin)
@@ -35,8 +43,6 @@ async def lifespan(app: FastAPI):
 
     if ADMIN_EMAIL and ADMIN_PASSWORD:
         async with async_session_maker() as session:
-            from sqlalchemy import select
-            from fastapi_users.password import PasswordHelper
 
             result = await session.execute(select(User).where(User.email == ADMIN_EMAIL))
             existing = result.scalar_one_or_none()
@@ -106,10 +112,13 @@ app.include_router(calendar.router)
 
 
 def main():
-    uvicorn.run("main:app",
-                host="0.0.0.0",
-                port=8000,
-                reload=True)
+    """main function for run server"""
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+    )
 
 if __name__ == "__main__":
     main()

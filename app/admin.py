@@ -1,17 +1,19 @@
+"""Main admin panel"""
 import os
 from sqladmin import ModelView
 from sqladmin.authentication import AuthenticationBackend
-from app.database.models import User, Team, Task, Meeting, Evaluation, Comment
 from starlette.requests import Request
 from fastapi_users.password import PasswordHelper
 from wtforms import PasswordField
 from fastapi import HTTPException
+from app.database.models import User, Team, Task, Meeting, Evaluation, Comment
 
 
 password_helper = PasswordHelper()
 
 """ аутентификация """
 class SimpleAuth(AuthenticationBackend):
+    """Auth default admin user"""
     async def authenticate(self, request: Request) -> bool:
         return bool(request.session.get("admin_user"))
 
@@ -28,8 +30,9 @@ class SimpleAuth(AuthenticationBackend):
         request.session.pop("admin_user", None)
 
 
-"""Регистрируем модели"""
+# Регистрируем модели
 class UserAdmin(ModelView, model=User):
+    """User admin panel"""
     column_list = [
         User.id,
         User.username,
@@ -70,21 +73,29 @@ class UserAdmin(ModelView, model=User):
     }
 
     async def scaffold_form(self, *args, **kwargs):
-        FormClass = await super().scaffold_form(*args, **kwargs)
-        if not hasattr(FormClass, "password"):
-            setattr(FormClass, "password", PasswordField("Password", render_kw={"class": "form-control", "id": "password"}))
-        return FormClass
+        form_class = await super().scaffold_form(*args, **kwargs)
+        if not hasattr(form_class, "password"):
+            setattr(
+                form_class, "password",
+                PasswordField(
+                    "Password",
+                    render_kw={"class": "form-control", "id": "password"}
+                )
+            )
+        return form_class
 
     async def insert_model(self, request: Request, data: dict):
         pw = None
         if "password" in data:
             pw = data.pop("password")
         if not pw:
-            raise HTTPException(status_code=400, detail="Password is required when creating a user via admin.")
+            raise HTTPException(
+                status_code=400,
+                detail="Password is required when creating a user via admin.")
         data["hashed_password"] = password_helper.hash(pw)
         return await super().insert_model(request, data)
 
-    async def update_model(self, request: Request, obj, data: dict):
+    async def update_model(self, request: Request, pk, data: dict):
         if "password" in data:
             pw = data.pop("password")
             if pw:
@@ -92,10 +103,11 @@ class UserAdmin(ModelView, model=User):
             else:
                 data.pop("hashed_password", None)
 
-        return await super().update_model(request, obj, data)
+        return await super().update_model(request, pk, data)
 
 
 class TeamAdmin(ModelView, model=Team):
+    """Team admin panel"""
     column_list = [
         Team.team_id,
         Team.team_name,
@@ -113,6 +125,7 @@ class TeamAdmin(ModelView, model=Team):
 
 
 class TaskAdmin(ModelView, model=Task):
+    """Task admin panel"""
     column_list = [
         Task.task_id,
         Task.task_name,
@@ -142,6 +155,7 @@ class TaskAdmin(ModelView, model=Task):
 
 
 class MeetingAdmin(ModelView, model=Meeting):
+    """Meeting admin panel"""
     column_list = [
         Meeting.meeting_id,
         Meeting.meeting_name,
@@ -159,6 +173,7 @@ class MeetingAdmin(ModelView, model=Meeting):
 
 
 class EvaluationAdmin(ModelView, model=Evaluation):
+    """Evaluation admin panel"""
     column_list = [
         Evaluation.evaluation_id,
         Evaluation.evaluation_value,
@@ -176,10 +191,15 @@ class EvaluationAdmin(ModelView, model=Evaluation):
     }
 
     column_searchable_list = [Evaluation.evaluation_value]
-    column_sortable_list = [Evaluation.evaluation_id, Evaluation.evaluation_value, Evaluation.created_at]
+    column_sortable_list = [
+        Evaluation.evaluation_id,
+        Evaluation.evaluation_value,
+        Evaluation.created_at
+    ]
 
 
 class CommentAdmin(ModelView, model=Comment):
+    """Comment admin panel"""
     column_list = [
         Comment.comment_id,
         Comment.content,
