@@ -1,5 +1,5 @@
 """pydantic schemas"""
-from typing import Optional
+from typing import Optional, List, Union
 from datetime import datetime
 from pydantic import BaseModel, EmailStr
 from fastapi_users import schemas
@@ -131,3 +131,41 @@ class TokenResponse(BaseModel):
     """verification of token response"""
     access_token: str
     token_type: str
+
+
+
+class CalendarEventBase(BaseModel):
+    """Базовая схема для событий календаря"""
+    id: str
+    title: str
+    start: str
+    type: str
+
+class TaskEvent(CalendarEventBase):
+    """Схема для задач в календаре"""
+    status: str
+    description: Optional[str] = None
+
+class MeetingEvent(CalendarEventBase):
+    """Схема для встреч в календаре"""
+    end: str
+    description: Optional[str] = None
+
+class CalendarEventResponse(BaseModel):
+    """Общая схема ответа для событий календаря"""
+    events: List[Union[TaskEvent, MeetingEvent]]
+
+class DayEventResponse(BaseModel):
+    """Схема для событий дня"""
+    type: str
+    id: int
+    title: str
+    time: str
+    description: Optional[str] = None
+    status: Optional[str] = None
+    duration: Optional[str] = None
+
+class DayCalendarResponse(BaseModel):
+    """Схема ответа для календаря дня"""
+    date: str
+    events: List[DayEventResponse]

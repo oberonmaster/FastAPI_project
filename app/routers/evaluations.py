@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import List, Optional
-from datetime import datetime, timedelta
-from app.database.database import async_session_maker
+from app.database.database import async_session_maker, get_async_session
 from app.database.models import Evaluation, Task, User, RoleEnum
+from app.database.repository import evaluation_repo
 from app.users import current_active_user
 from app.schemas import EvaluationCreate, EvaluationRead
 
@@ -106,11 +107,11 @@ async def get_my_evaluations(
 
 @router.get("/user/{user_id}/average")
 async def get_user_average_rating(
-        user_id: int,
-        period_days: Optional[int] = 30,
-        current_user: User = Depends(current_active_user)
+    user_id: int,
+    period_days: Optional[int] = 30,
+    current_user: User = Depends(current_active_user),
+    db: AsyncSession = Depends(get_async_session)
 ):
-
     """Получить средний рейтинг пользователя за период"""
     if current_user.id != user_id and current_user.role not in [RoleEnum.admin, RoleEnum.team_admin, RoleEnum.manager]:
         raise HTTPException(
@@ -118,29 +119,8 @@ async def get_user_average_rating(
             detail="Not enough permissions"
         )
 
-    async with async_session_maker() as session:
-        start_date = datetime.utcnow() - timedelta(days=period_days)
-
-        result = await session.execute(
-            select(Evaluation).join(Evaluation.task).where(
-                Task.task_executor == user_id,
-                Evaluation.created_at >= start_date
-            )
-        )
-        evaluations = result.scalars().all()
-
-        if not evaluations:
-            return {"average_rating": None, "total_evaluations": 0}
-
-        total = sum(eval.evaluation_value for eval in evaluations)
-        average = total / len(evaluations)
-
-        return {
-            "average_rating": round(average, 2),
-            "total_evaluations": len(evaluations),
-            "period_days": period_days
-        }
-
+    result = await evaluation_repo.get_user_average_rating(db, user_id, period_days)
+    return result
 
 @router.get("/{evaluation_id}", response_model=EvaluationRead)
 async def get_evaluation(
