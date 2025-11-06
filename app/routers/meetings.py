@@ -1,11 +1,13 @@
+"""роутеры для встреч"""
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.future import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
-from datetime import datetime, timedelta
-from app.database.database import async_session_maker
-from app.database.models import Meeting, User, RoleEnum
+from datetime import datetime
+from app.database.database import get_async_session
+from app.database.models import User, RoleEnum
 from app.users import current_active_user
 from app.schemas import MeetingCreate, MeetingRead
+from app.database.repository import meeting_repo, user_repo
 
 
 router = APIRouter(prefix="/meetings", tags=["meetings"])
@@ -14,65 +16,69 @@ router = APIRouter(prefix="/meetings", tags=["meetings"])
 @router.post("/", response_model=MeetingRead)
 async def create_meeting(
         meeting: MeetingCreate,
-        current_user: User = Depends(current_active_user)
+        current_user: User = Depends(current_active_user),
+        db: AsyncSession = Depends(get_async_session)
 ):
+    """создание встречи"""
     if current_user.role not in [RoleEnum.admin, RoleEnum.team_admin, RoleEnum.manager]:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=403,
             detail="Not enough permissions"
         )
 
-    async with async_session_maker() as session:
-        meeting_end = meeting.meeting_date + timedelta(minutes=meeting.duration_minutes or 60)
+    # проверка участников
+    participants = []
+    for user_id in meeting.participant_ids:
+        user = await user_repo.get_user_by_id(db, user_id)
 
-        for user_id in meeting.participant_ids:
-            user = await session.get(User, user_id)
-            if not user:
-                raise HTTPException(status_code=404, detail=f"User {user_id} not found")
-
-            existing_meetings_result = await session.execute(
-                select(Meeting).join(Meeting.participants).where(
-                    User.id == user_id
-                )
+        if not user:
+            raise HTTPException(
+                status_code=404,
+                detail=f"User {user_id} not found"
             )
-            existing_meetings = existing_meetings_result.scalars().all()
 
-            for existing_meeting in existing_meetings:
-                existing_meeting_end = existing_meeting.meeting_date + timedelta(
-                    minutes=existing_meeting.duration_minutes)
+        participants.append(user)
 
-                if (meeting.meeting_date < existing_meeting_end and
-                        meeting_end > existing_meeting.meeting_date):
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"User {user.username} has a conflicting meeting: {existing_meeting.meeting_name}"
-                    )
+    # проверка конфликтующих встреч
+    conflict_meetings = await meeting_repo.check_meeting_conflicts(
+        db,
+        meeting.participant_ids,
+        meeting.meeting_date,
+        meeting.duration_minutes or 60
+    )
 
+    if conflict_meetings:
+        conflict_info = []
 
-        participants = []
-        for user_id in meeting.participant_ids:
-            user = await session.get(User, user_id)
-            if user:
-                participants.append(user)
-
-
-        creator_in_list = any(user.id == current_user.id for user in participants)
-        if not creator_in_list:
-            participants.append(current_user)
-
-        db_meeting = Meeting(
-            meeting_name=meeting.meeting_name,
-            meeting_description=meeting.meeting_description,
-            meeting_date=meeting.meeting_date,
-            duration_minutes=meeting.duration_minutes or 60,
-            meeting_admin=current_user.id,
-            participants=participants
+        for conflict in conflict_meetings:
+            for user in conflict.participants:
+                if user.id in meeting.participant_ids:
+                    conflict_info.append(f"User {user.username} has conflict meeting: {conflict.meeting_name}")
+                    break
+        raise HTTPException(
+            status_code=400,
+            detail="; ".join(conflict_info)
         )
-        session.add(db_meeting)
-        await session.commit()
-        await session.refresh(db_meeting)
-        return db_meeting
 
+    # добавление организатора в список участников
+    creator_in_list = any(user.id == current_user.id for user in participants)
+    if not creator_in_list:
+        creator = await user_repo.get_user_by_id(db, current_user.id)
+        if creator:
+            participants.append(creator)
+
+    # создание встречи
+    meeting_data = {
+        "meeting_name": meeting.meeting_name,
+        "meeting_description": meeting.meeting_description,
+        "meeting_date": meeting.meeting_date,
+        "duration_minutes": meeting.duration_minutes or 60,
+        "meeting_admin": current_user.id,
+        "participants": participants
+    }
+
+    db_meeting = await meeting_repo.create_meeting(db, meeting_data)
+    return MeetingRead.model_validate(db_meeting)
 
 @router.get("/", response_model=List[MeetingRead])
 async def get_meetings(
@@ -80,163 +86,160 @@ async def get_meetings(
         limit: int = 100,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        current_user: User = Depends(current_active_user)
+        current_user: User = Depends(current_active_user),
+        db: AsyncSession = Depends(get_async_session)
 ):
-    async with async_session_maker() as session:
+    """получение информации о встрече"""
+    if current_user.role in [RoleEnum.admin]:
+        meetings = await meeting_repo.get_meetings_by_filters(db, skip, limit, start_date, end_date)
+    else:
+        meetings = await meeting_repo.get_meetings_by_filters(db, skip, limit, start_date, end_date, current_user.id)
 
-        query = select(Meeting)
-
-
-        if start_date:
-            query = query.where(Meeting.meeting_date >= start_date)
-        if end_date:
-            query = query.where(Meeting.meeting_date <= end_date)
-
-        if current_user.role in [RoleEnum.admin]:
-            pass
-        else:
-            query = query.where(Meeting.participants.any(id=current_user.id))
-
-        result = await session.execute(query.offset(skip).limit(limit))
-        return result.scalars().all()
+    return [MeetingRead.model_validate(meeting) for meeting in meetings]
 
 
 @router.get("/my-meetings", response_model=List[MeetingRead])
 async def get_my_meetings(
-        current_user: User = Depends(current_active_user)
+        current_user: User = Depends(current_active_user),
+        db: AsyncSession = Depends(get_async_session)
 ):
     """Получить встречи текущего пользователя"""
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(Meeting).where(Meeting.participants.any(id=current_user.id))
-            .order_by(Meeting.meeting_date)
-        )
-        return result.scalars().all()
+    meetings = await meeting_repo.get_user_meetings(db, current_user.id)
+    return [MeetingRead.model_validate(meeting) for meeting in meetings]
 
 
 @router.get("/{meeting_id}", response_model=MeetingRead)
 async def get_meeting(
         meeting_id: int,
-        current_user: User = Depends(current_active_user)
+        current_user: User = Depends(current_active_user),
+        db: AsyncSession = Depends(get_async_session)
 ):
-    async with async_session_maker() as session:
-        meeting = await session.get(Meeting, meeting_id)
-        if not meeting:
-            raise HTTPException(status_code=404, detail="Meeting not found")
+    """получение встречи по id"""
+    meeting = await meeting_repo.get_meeting_by_id(db, meeting_id)
+    if not meeting:
+        raise HTTPException(
+            status_code=404,
+            detail="Meeting not found"
+        )
 
-
-        if (current_user.role not in [RoleEnum.admin, RoleEnum.team_admin, RoleEnum.manager] and
-                current_user not in meeting.participants):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not enough permissions"
-            )
-
-        return meeting
+    if (current_user.role not in [RoleEnum.admin, RoleEnum.team_admin, RoleEnum.manager] and
+            current_user not in meeting.participants):
+        raise HTTPException(
+            status_code=403,
+            detail="Not enough permissions"
+        )
+    return MeetingRead.model_validate(meeting)
 
 
 @router.put("/{meeting_id}", response_model=MeetingRead)
 async def update_meeting(
         meeting_id: int,
         meeting_update: MeetingCreate,
-        current_user: User = Depends(current_active_user)
+        current_user: User = Depends(current_active_user),
+        db: AsyncSession = Depends(get_async_session)
 ):
-    async with async_session_maker() as session:
-        meeting = await session.get(Meeting, meeting_id)
-        if not meeting:
-            raise HTTPException(status_code=404, detail="Meeting not found")
+    """ обновление встречи """
+    meeting = await meeting_repo.get_meeting_by_id(db, meeting_id)
+    if not meeting:
+        raise HTTPException(
+            status_code=404,
+            detail="Meeting not found"
+        )
 
-        if meeting.meeting_admin != current_user.id and current_user.role != RoleEnum.admin:
+    if meeting.meeting_admin != current_user.id and current_user.role != RoleEnum.admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Not meeting admin"
+        )
+
+    # проверка участников
+    participants = []
+    for user_id in meeting_update.participant_ids:
+        user = await user_repo.get_user_by_id(db, user_id)
+        if not user:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not meeting admin"
+                status_code=404,
+                detail=f"User {user_id} not found"
             )
+        participants.append(user)
 
+    # проверка конфликтов
+    conflict_meetings = meeting_repo.check_meeting_conflicts(
+        db,
+        meeting_update.participant_ids,
+        meeting_update.meeting_date,
+        meeting_update.duration_minutes or 60,
+        meeting_id
+    )
 
-        meeting_end = meeting_update.meeting_date + timedelta(minutes=meeting_update.duration_minutes or 60)
+    if conflict_meetings:
+        conflict_info = []
+        for conflict in conflict_info:
+            for user in conflict.participants:
+                if user.id in meeting_update.participant_ids:
+                    conflict_info.append(f"User {user.username} has conflict meeting: {conflict.meeting_name}")
+                    break
+        raise HTTPException(
+            status_code=400,
+            detail="; ".join(conflict_info)
+        )
 
-        for user_id in meeting_update.participant_ids:
-            user = await session.get(User, user_id)
-            if not user:
-                raise HTTPException(status_code=404, detail=f"User {user_id} not found")
+    # обновление встречи
+    meeting_data = {
+        "meeting_name": meeting_update.meeting_name,
+        "meeting_description": meeting_update.meeting_description,
+        "meeting_date": meeting_update.meeting_date,
+        "duration_minutes": meeting_update.duration_minutes or 60,
+        "participants": participants
+    }
 
-
-            existing_meetings_result = await session.execute(
-                select(Meeting).join(Meeting.participants).where(
-                    User.id == user_id,
-                    Meeting.meeting_id != meeting_id
-
-                )
-            )
-            existing_meetings = existing_meetings_result.scalars().all()
-
-            for existing_meeting in existing_meetings:
-                existing_meeting_end = existing_meeting.meeting_date + timedelta(
-                    minutes=existing_meeting.duration_minutes)
-
-                if (meeting_update.meeting_date < existing_meeting_end and
-                        meeting_end > existing_meeting.meeting_date):
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"User {user.username} has a conflicting meeting: {existing_meeting.meeting_name}"
-                    )
-
-
-        participants = []
-        for user_id in meeting_update.participant_ids:
-            user = await session.get(User, user_id)
-            if user:
-                participants.append(user)
-
-
-        meeting.meeting_name = meeting_update.meeting_name
-        meeting.meeting_description = meeting_update.meeting_description
-        meeting.meeting_date = meeting_update.meeting_date
-        meeting.duration_minutes = meeting_update.duration_minutes or 60
-        meeting.participants = participants
-
-        await session.commit()
-        await session.refresh(meeting)
-        return meeting
+    updated_meeting = await meeting_repo.update_meeting(db, meeting_id, meeting_data)
+    return [MeetingRead.model_validate(updated_meeting)]
 
 
 @router.delete("/{meeting_id}")
 async def delete_meeting(
         meeting_id: int,
-        current_user: User = Depends(current_active_user)
+        current_user: User = Depends(current_active_user),
+        db: AsyncSession = Depends(get_async_session)
 ):
-    async with async_session_maker() as session:
-        meeting = await session.get(Meeting, meeting_id)
-        if not meeting:
-            raise HTTPException(status_code=404, detail="Meeting not found")
+    """удаление встречи"""
+    meeting = await meeting_repo.get_meeting_by_id(db, meeting_id)
+    if not meeting:
+        raise HTTPException(
+            status_code=404,
+            detail="Meeting not found"
+        )
 
-        if meeting.meeting_admin != current_user.id and current_user.role != RoleEnum.admin:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not meeting admin"
-            )
+    if meeting.meeting_admin != current_user.id and current_user.role != RoleEnum.admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Not meeting admin"
+        )
 
-        await session.delete(meeting)
-        await session.commit()
-        return {"message": "Meeting deleted successfully"}
+    await meeting_repo.delete_meeting(db, meeting_id)
+    return {"message": "Meeting deleted successfully"}
 
 
 @router.post("/{meeting_id}/cancel")
 async def cancel_meeting(
         meeting_id: int,
-        current_user: User = Depends(current_active_user)
+        current_user: User = Depends(current_active_user),
+        db: AsyncSession = Depends(get_async_session)
 ):
-    async with async_session_maker() as session:
-        meeting = await session.get(Meeting, meeting_id)
-        if not meeting:
-            raise HTTPException(status_code=404, detail="Meeting not found")
+    """отмена встерчи"""
+    meeting = await meeting_repo.get_meeting_by_id(db, meeting_id)
+    if not meeting:
+        raise HTTPException(
+            status_code=404,
+            detail="Meeting not found"
+        )
 
-        if meeting.meeting_admin != current_user.id and current_user.role != RoleEnum.admin:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not meeting admin"
-            )
+    if meeting.meeting_admin != current_user.id and current_user.role != RoleEnum.admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Not meeting admin"
+        )
 
-        await session.delete(meeting)
-        await session.commit()
-        return {"message": "Meeting cancelled successfully"}
+    await meeting_repo.delete_meeting(db, meeting_id)
+    return {"message": "Meeting cancelled successfully"}

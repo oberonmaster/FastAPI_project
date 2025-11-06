@@ -1,10 +1,10 @@
+"""маршруты для оценок"""
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
 from typing import List, Optional
-from app.database.database import async_session_maker, get_async_session
-from app.database.models import Evaluation, Task, User, RoleEnum
-from app.database.repository import evaluation_repo
+from app.database.database import get_async_session
+from app.database.models import Evaluation, User, RoleEnum
+from app.database.repository import evaluation_repo, task_repo
 from app.users import current_active_user
 from app.schemas import EvaluationCreate, EvaluationRead
 
@@ -15,54 +15,57 @@ router = APIRouter(prefix="/evaluations", tags=["evaluations"])
 @router.post("/", response_model=EvaluationRead)
 async def create_evaluation(
         evaluation: EvaluationCreate,
-        current_user: User = Depends(current_active_user)
+        current_user: User = Depends(current_active_user),
+        db: AsyncSession = Depends(get_async_session)
 ):
+    """создание оценки"""
+
     if current_user.role not in [RoleEnum.admin, RoleEnum.team_admin, RoleEnum.manager]:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=403,
             detail="Not enough permissions"
         )
-
-    async with async_session_maker() as session:
-        task = await session.get(Task, evaluation.task_id)
-        if not task:
-            raise HTTPException(status_code=404, detail="Task not found")
-
-        if task.status != "completed":
-            raise HTTPException(
-                status_code=400,
-                detail="Can only evaluate completed tasks"
-            )
-
-        if task.task_checker != current_user.id and current_user.role != RoleEnum.admin:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not task checker"
-            )
-
-        existing_eval = await session.execute(
-            select(Evaluation).where(
-                Evaluation.task_id == evaluation.task_id,
-                Evaluation.evaluator_id == current_user.id
-            )
+    # получение задачи через репозиторий
+    task = await task_repo.get_task_by_id(db, evaluation.task_id)
+    if not task:
+        raise HTTPException(
+            status_code=404,
+            detail="Task not found"
         )
-        if existing_eval.scalar_one_or_none():
-            raise HTTPException(
-                status_code=400,
-                detail="Task already evaluated by this user"
-            )
 
-        db_evaluation = Evaluation(
-            evaluation_value=evaluation.evaluation_value,
-            evaluation_name=evaluation.evaluation_name,
-            evaluation_comment=evaluation.evaluation_comment,
-            task_id=evaluation.task_id,
-            evaluator_id=current_user.id
+    # бизнес-логика
+    if task.status != "completed":
+        raise HTTPException(
+            status_code=400,
+            detail="Can only evaluate completed tasks"
         )
-        session.add(db_evaluation)
-        await session.commit()
-        await session.refresh(db_evaluation)
-        return db_evaluation
+
+    if task.task_checker != current_user.id and current_user.role != RoleEnum.admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not task checker"
+        )
+
+    # проверка дублей
+    if await evaluation_repo.check_duplicate_evaluations(db, evaluation.task_id, current_user.id):
+        raise HTTPException(
+            status_code=400,
+            detail="Task already evaluated by this user"
+        )
+
+    # создание оценки
+    db_evaluation = Evaluation(
+        evaluation_value=evaluation.evaluation_value,
+        evaluation_name=evaluation.evaluation_name,
+        evaluation_comment=evaluation.evaluation_comment,
+        task_id=evaluation.task_id,
+        evaluator_id=current_user.id
+    )
+
+    db.add(db_evaluation)
+    await db.commit()
+    await db.refresh(db_evaluation)
+    return EvaluationRead.model_validate(db_evaluation)
 
 
 @router.get("/", response_model=List[EvaluationRead])
@@ -71,38 +74,29 @@ async def get_evaluations(
         limit: int = 100,
         task_id: Optional[int] = None,
         user_id: Optional[int] = None,
-        current_user: User = Depends(current_active_user)
+        current_user: User = Depends(current_active_user),
+        db: AsyncSession = Depends(get_async_session)
 ):
-    async with async_session_maker() as session:
-        query = select(Evaluation)
+    # получение оценки через репозиторий
+    evaluations = await evaluation_repo.get_evaluations_by_filters(db, skip, limit, task_id, user_id)
 
-        if task_id:
-            query = query.where(Evaluation.task_id == task_id)
-        if user_id:
-            query = query.where(Evaluation.evaluator_id == user_id)
-
-        if current_user.role not in [RoleEnum.admin, RoleEnum.team_admin, RoleEnum.manager]:
-            query = query.join(Evaluation.task).where(
-                (Task.task_executor == current_user.id) |
-                (Task.task_checker == current_user.id)
-            )
-
-        result = await session.execute(query.offset(skip).limit(limit))
-        return result.scalars().all()
+    # проверка прав доступа
+    if current_user.role not in [RoleEnum.admin, RoleEnum.team_admin, RoleEnum.manager]:
+        evaluations = [evaluation for evaluation in evaluations if
+                       evaluation.task.task_executor == current_user.id or
+                       evaluation.task.task_checker == current_user.id]
+        return [EvaluationRead.model_validate(ev) for ev in evaluations]
+    return None
 
 
 @router.get("/my-evaluations", response_model=List[EvaluationRead])
 async def get_my_evaluations(
-        current_user: User = Depends(current_active_user)
+        current_user: User = Depends(current_active_user),
+        db: AsyncSession = Depends(get_async_session)
 ):
     """Получить оценки текущего пользователя"""
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(Evaluation).join(Evaluation.task).where(
-                Task.task_executor == current_user.id
-            ).order_by(Evaluation.created_at.desc())
-        )
-        return result.scalars().all()
+    evaluations = await evaluation_repo.get_user_evaluations(db, current_user.id)
+    return [EvaluationRead.model_validate(ev) for ev in evaluations]
 
 
 @router.get("/user/{user_id}/average")
@@ -115,76 +109,90 @@ async def get_user_average_rating(
     """Получить средний рейтинг пользователя за период"""
     if current_user.id != user_id and current_user.role not in [RoleEnum.admin, RoleEnum.team_admin, RoleEnum.manager]:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=403,
             detail="Not enough permissions"
         )
 
     result = await evaluation_repo.get_user_average_rating(db, user_id, period_days)
     return result
 
+
 @router.get("/{evaluation_id}", response_model=EvaluationRead)
 async def get_evaluation(
         evaluation_id: int,
-        current_user: User = Depends(current_active_user)
+        current_user: User = Depends(current_active_user),
+        db: AsyncSession = Depends(get_async_session)
 ):
-    async with async_session_maker() as session:
-        evaluation = await session.get(Evaluation, evaluation_id)
-        if not evaluation:
-            raise HTTPException(status_code=404, detail="Evaluation not found")
+    """получение оценки"""
+    evaluation = await evaluation_repo.get_evaluation_by_id(Evaluation, evaluation_id)
 
-        task = evaluation.task
-        if (current_user.role not in [RoleEnum.admin, RoleEnum.team_admin, RoleEnum.manager] and
-                task.task_executor != current_user.id and task.task_checker != current_user.id):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not enough permissions"
-            )
+    if not evaluation:
+        raise HTTPException(
+            status_code=404,
+            detail="Evaluation not found"
+        )
 
-        return evaluation
+    task = evaluation.task
+    if (current_user.role not in [RoleEnum.admin, RoleEnum.team_admin, RoleEnum.manager] and
+            task.task_executor != current_user.id and task.task_checker != current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions"
+        )
+
+    return EvaluationRead.model_validate(evaluation)
 
 
 @router.put("/{evaluation_id}", response_model=EvaluationRead)
 async def update_evaluation(
         evaluation_id: int,
         evaluation_update: EvaluationCreate,
-        current_user: User = Depends(current_active_user)
+        current_user: User = Depends(current_active_user),
+        db: AsyncSession = Depends(get_async_session)
 ):
-    async with async_session_maker() as session:
-        evaluation = await session.get(Evaluation, evaluation_id)
-        if not evaluation:
-            raise HTTPException(status_code=404, detail="Evaluation not found")
+    """обновление оценки"""
+    evaluation = await evaluation_repo.get_evaluation_by_id(Evaluation, evaluation_id)
+    if not evaluation:
+        raise HTTPException(
+            status_code=404,
+            detail="Evaluation not found"
+        )
 
-        if evaluation.evaluator_id != current_user.id and current_user.role != RoleEnum.admin:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not evaluation author"
-            )
+    if evaluation.evaluator_id != current_user.id and current_user.role != RoleEnum.admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Not evaluation author"
+        )
 
-        evaluation.evaluation_value = evaluation_update.evaluation_value
-        evaluation.evaluation_name = evaluation_update.evaluation_name
-        evaluation.evaluation_comment = evaluation_update.evaluation_comment
+    evaluation.evaluation_value = evaluation_update.evaluation_value
+    evaluation.evaluation_name = evaluation_update.evaluation_name
+    evaluation.evaluation_comment = evaluation_update.evaluation_comment
 
-        await session.commit()
-        await session.refresh(evaluation)
-        return evaluation
+    await db.commit()
+    await db.refresh(evaluation)
+    return EvaluationRead.model_validate(evaluation)
 
 
 @router.delete("/{evaluation_id}")
 async def delete_evaluation(
         evaluation_id: int,
-        current_user: User = Depends(current_active_user)
+        current_user: User = Depends(current_active_user),
+        db: AsyncSession = Depends(get_async_session)
 ):
-    async with async_session_maker() as session:
-        evaluation = await session.get(Evaluation, evaluation_id)
-        if not evaluation:
-            raise HTTPException(status_code=404, detail="Evaluation not found")
+    """удаление оценки"""
+    evaluation = await evaluation_repo.get_evaluation_by_id(Evaluation, evaluation_id)
+    if not evaluation:
+        raise HTTPException(
+            status_code=404,
+            detail="Evaluation not found"
+        )
 
-        if evaluation.evaluator_id != current_user.id and current_user.role != RoleEnum.admin:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not evaluation author"
-            )
+    if evaluation.evaluator_id != current_user.id and current_user.role != RoleEnum.admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Not evaluation author"
+        )
 
-        await session.delete(evaluation)
-        await session.commit()
-        return {"message": "Evaluation deleted successfully"}
+    await db.delete(evaluation)
+    await db.commit()
+    return {"message": "Evaluation deleted successfully"}

@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
 from typing import List
 from app.database.database import get_async_session
-from app.database.models import User, Team, RoleEnum
+from app.database.models import User, RoleEnum
+from app.database.repository import user_repo, team_repo
 from app.users import current_active_user
 from app.schemas import UserRead, UserUpdate
 
@@ -13,8 +13,7 @@ router = APIRouter(prefix="/api/users", tags=["users"])
 
 @router.get("/me", response_model=UserRead)
 async def get_me(user: User = Depends(current_active_user)):
-
-    return user
+    return UserRead.model_validate(user)
 
 
 @router.put("/me", response_model=UserRead)
@@ -23,8 +22,7 @@ async def update_me(
         user: User = Depends(current_active_user),
         db: AsyncSession = Depends(get_async_session)
 ):
-
-
+    """ обновление информации пользователя"""
     update_data = user_update.dict(exclude_unset=True)
     allowed_fields = ['username']
 
@@ -34,7 +32,7 @@ async def update_me(
 
     await db.commit()
     await db.refresh(user)
-    return user
+    return UserRead.model_validate(user)
 
 
 @router.get("/", response_model=List[UserRead])
@@ -44,15 +42,15 @@ async def get_users(
         db: AsyncSession = Depends(get_async_session),
         current_user: User = Depends(current_active_user)
 ):
-
+    """ получение пользователей"""
     if current_user.role not in [RoleEnum.admin, RoleEnum.team_admin, RoleEnum.manager]:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=403,
             detail="Not enough permissions"
         )
 
-    result = await db.execute(select(User).offset(skip).limit(limit))
-    return result.scalars().all()
+    users = await user_repo.get_users(db, skip, limit)
+    return [UserRead.model_validate(user) for user in users]
 
 
 @router.post("/join-team/{invite_code}")
@@ -61,18 +59,15 @@ async def join_team(
         db: AsyncSession = Depends(get_async_session),
         current_user: User = Depends(current_active_user)
 ):
-
-
-    result = await db.execute(select(Team).where(Team.invite_code == invite_code))
-    team = result.scalar_one_or_none()
-
+    """присоединить к группе"""
+    team = await team_repo.get_team_by_invite_code(db, invite_code)
     if not team:
-        raise HTTPException(status_code=404, detail="Invalid invite code")
+        raise HTTPException(
+            status_code=404,
+            detail="Invalid invite code"
+        )
 
-
-    current_user.member_of_team = team.team_id
-    await db.commit()
-
+    await user_repo.update_user_team(db, current_user.id, team.team_id)
     return {"message": f"Successfully joined team {team.team_name}"}
 
 
@@ -81,11 +76,12 @@ async def leave_team(
         db: AsyncSession = Depends(get_async_session),
         current_user: User = Depends(current_active_user)
 ):
+    """покинуть группу"""
 
     if not current_user.member_of_team:
-        raise HTTPException(status_code=400, detail="Not a member of any team")
-
-    current_user.member_of_team = None
-    await db.commit()
-
+        raise HTTPException(
+            status_code=400,
+            detail="Not a member of any team"
+        )
+    await user_repo.update_user_team(db, current_user.id, None)
     return {"message": "Successfully left the team"}

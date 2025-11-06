@@ -184,7 +184,7 @@ class TaskRepository:
         task = Task(**task_data)
         db.add(task)
         await db.commit()
-        await db.refresh()
+        await db.refresh(task)
         return task
 
     @staticmethod
