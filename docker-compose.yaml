@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=fastapi_project
+      - DB_USER=postgres
+      - DB_PASS=postgres
+      - SECRET_KEY=use_your_secret_key_for_dev
+      - ADMIN_EMAIL=admin@example.com
+      - ADMIN_PASSWORD=admin
+      - ADMIN_USERNAME=admin
+    depends_on:
+      - db
+    volumes:
+      - .:/app
+
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=fastapi_project
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    ports:
+      - "5432:5432" # primary
+#      - "5433:5432" # secondary - if in system already using postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    command: >
+      postgres 
+      -c shared_preload_libraries=pg_stat_statements 
+      -c pg_stat_statements.track=all
+
+volumes:
+  postgres_data:
