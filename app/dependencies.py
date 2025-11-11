@@ -1,4 +1,6 @@
 """Dependencies"""
+# TODO две строки между классами
+
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.database import get_async_session

@@ -1,3 +1,9 @@
+"""
+
+"""
+# TODO две строки между классами
+
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Dict, Union
@@ -29,7 +35,7 @@ async def get_events_utility(
     for task in tasks:
         events.append(TaskEvent(
             id=f"task_{task.task_id}",
-            title=f"{task.task_name}",
+            title=task.task_name,
             start=task.deadline.isoformat() if task.deadline else None,
             type="task",
             status=task.status,
@@ -99,6 +105,7 @@ async def get_month_calendar(
             calendar_text += "  No events\n"
         else:
             for event in day_events:
+                #TODO переименовать эту хуйню
                 event_type = "📝" if event.type == "task" else "👥"
                 calendar_text += f"  {event_type} {event.title}\n"
 
@@ -157,7 +164,6 @@ async def get_upcoming_events(
         db: AsyncSession = Depends(get_async_session),
         current_user: User = Depends(current_active_user)
 ):
-
 
     start_date = datetime.now()
     end_date = start_date + timedelta(days=days)

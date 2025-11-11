@@ -1,4 +1,8 @@
 """ Модели данных для заполнения базы """
+# TODO две строки между классами
+
+# комментарии для визуального разделения частей моделей
+
 from sqlalchemy import (Table,
                         Column,
                         Integer,
@@ -46,6 +50,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True, unique=True)
 
     # Fields
+    # Поля
     username = Column(String, unique=True, index=True)
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String, nullable=False)
@@ -56,6 +61,7 @@ class User(Base):
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
     # Relations
+    # Связи
     member_of_team = Column(Integer, ForeignKey("teams.team_id"), nullable=True)
     team = relationship("Team", back_populates="members", foreign_keys=[member_of_team], lazy="joined")
     admin_of = relationship("Team", back_populates="admin", uselist=False, foreign_keys="Team.team_admin", lazy="selectin")
@@ -84,6 +90,7 @@ class Task(Base):
     task_id = Column(Integer, primary_key=True, index=True, unique=True)
 
     # Fields
+    # Поля
     task_name = Column(String, nullable=False)
     task_description = Column(Text, nullable=True)
     status = Column(Enum(TaskStatusEnum), default=TaskStatusEnum.open, nullable=False)
@@ -91,6 +98,7 @@ class Task(Base):
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
     # Relations
+    # Связи
     task_executor = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     task_checker = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     team_id = Column(Integer, ForeignKey("teams.team_id"), nullable=True)
@@ -113,11 +121,13 @@ class Team(Base):
     team_id = Column(Integer, primary_key=True, index=True, unique=True)
 
     # Fields
+    # Поля
     team_name = Column(String, unique=True, index=True)
     invite_code = Column(String, unique=True, nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
     # Relations
+    # Связи
     team_admin = Column(Integer, ForeignKey("users.id"), nullable=True)
     admin = relationship("User", back_populates="admin_of", foreign_keys=[team_admin], uselist=False, lazy="joined")
     members = relationship("User", back_populates="team", foreign_keys="User.member_of_team", lazy="selectin", cascade="all, delete-orphan")
@@ -129,6 +139,7 @@ class Meeting(Base):
     meeting_id = Column(Integer, primary_key=True, index=True, unique=True)
 
     # Fields
+    # Поля
     meeting_name = Column(String, nullable=False)
     meeting_description = Column(Text, nullable=True)
     meeting_date = Column(TIMESTAMP(timezone=True), nullable=False)
@@ -136,6 +147,7 @@ class Meeting(Base):
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
     # Relations
+    # Связи
     meeting_admin = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     admin = relationship("User", foreign_keys=[meeting_admin], lazy="joined")
     participants = relationship("User", secondary=meeting_participants, back_populates="meetings", lazy="selectin")
@@ -144,6 +156,9 @@ class Meeting(Base):
 class Evaluation(Base):
     __tablename__ = "evaluations"
     evaluation_id = Column(Integer, primary_key=True, index=True, unique=True)
+
+    # Fields
+    # Поля
     evaluation_name = Column(String, nullable=True)
     evaluation_value = Column(Integer, nullable=False)
     evaluation_comment = Column(Text, nullable=True)
@@ -155,6 +170,7 @@ class Evaluation(Base):
     )
 
     # Relations
+    # Связи
     task_id = Column(Integer, ForeignKey("tasks.task_id", ondelete="CASCADE"), nullable=False)
     evaluator_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     task = relationship("Task", back_populates="evaluations", foreign_keys=[task_id], lazy="joined")
@@ -164,10 +180,14 @@ class Evaluation(Base):
 class Comment(Base):
     __tablename__ = "comments"
     comment_id = Column(Integer, primary_key=True, index=True, unique=True)
+
+    # Fields
+    # Поля
     content = Column(Text, nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
     # Relations
+    # Связи
     task_id = Column(Integer, ForeignKey("tasks.task_id", ondelete="CASCADE"), nullable=False)
     author_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     task = relationship("Task", back_populates="comments", foreign_keys=[task_id], lazy="joined")

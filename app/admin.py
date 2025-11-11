@@ -1,4 +1,6 @@
 """Main admin panel"""
+# TODO две строки между классами
+
 import os
 from sqladmin import ModelView
 from sqladmin.authentication import AuthenticationBackend

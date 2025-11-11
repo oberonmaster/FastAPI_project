@@ -1,4 +1,6 @@
 """pydantic schemas"""
+# TODO две строки между классами
+
 from typing import Optional, List, Union
 from datetime import datetime
 from pydantic import BaseModel, EmailStr
@@ -136,6 +138,7 @@ class TokenResponse(BaseModel):
 
 class CalendarEventBase(BaseModel):
     """Базовая схема для событий календаря"""
+    #TODO проверить типы
     id: str
     title: str
     start: str

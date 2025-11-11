@@ -1,4 +1,6 @@
 """Репозиторий для работы с базой данных - выносим все запросы сюда"""
+# TODO две строки между классами
+
 from datetime import datetime, date, timedelta
 from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession

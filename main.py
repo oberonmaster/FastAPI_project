@@ -1,6 +1,9 @@
 """
 Основной скрипт создания и запуска приложения + админ
 """
+
+# TODO две строки между классами
+
 import os
 from contextlib import asynccontextmanager
 import uvicorn

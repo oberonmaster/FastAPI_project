@@ -89,7 +89,7 @@
 
 ### 1. Клонирование и настройка
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/oberonmaster/FastAPI_project
 cd FastAPI_project
 python -m venv .venv
 source .venv/bin/activate  # Linux/MacOS

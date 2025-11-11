@@ -1,4 +1,6 @@
 """users manipulation"""
+# TODO две строки между классами
+
 import os
 from typing import Optional
 from dotenv import load_dotenv
