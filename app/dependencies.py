@@ -1,6 +1,4 @@
 """Dependencies"""
-# TODO две строки между классами
-
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.database import get_async_session
@@ -20,7 +18,9 @@ async def get_admin_user(current_user: User = Depends(current_active_user)):
 
 async def get_manager_user(current_user: User = Depends(current_active_user)):
     """getting manager user"""
-    if current_user.role not in [RoleEnum.admin, RoleEnum.team_admin, RoleEnum.manager]:
+    if current_user.role not in [RoleEnum.admin,
+                                 RoleEnum.team_admin,
+                                 RoleEnum.manager]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Manager access required"
@@ -30,7 +30,8 @@ async def get_manager_user(current_user: User = Depends(current_active_user)):
 
 async def get_team_admin_user(current_user: User = Depends(current_active_user)):
     """getting team admin user"""
-    if current_user.role not in [RoleEnum.admin, RoleEnum.team_admin]:
+    if current_user.role not in [RoleEnum.admin,
+                                 RoleEnum.team_admin]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Team admin access required"
@@ -52,7 +53,8 @@ async def verify_team_member(
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
 
-    if current_user.member_of_team != team_id and current_user.role != RoleEnum.admin:
+    if (current_user.member_of_team != team_id
+            and current_user.role != RoleEnum.admin):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not a member of this team"

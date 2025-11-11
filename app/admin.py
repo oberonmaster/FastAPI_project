@@ -1,6 +1,4 @@
-"""Main admin panel"""
-# TODO две строки между классами
-
+"""Админская панель"""
 import os
 from sqladmin import ModelView
 from sqladmin.authentication import AuthenticationBackend
@@ -8,12 +6,20 @@ from starlette.requests import Request
 from fastapi_users.password import PasswordHelper
 from wtforms import PasswordField
 from fastapi import HTTPException
-from app.database.models import User, Team, Task, Meeting, Evaluation, Comment
+from app.database.models import (User,
+                                 Team,
+                                 Task,
+                                 Meeting,
+                                 Evaluation,
+                                 Comment)
 
 
 password_helper = PasswordHelper()
 
+
 """ аутентификация """
+
+
 class SimpleAuth(AuthenticationBackend):
     """Auth default admin user"""
     async def authenticate(self, request: Request) -> bool:
@@ -34,39 +40,31 @@ class SimpleAuth(AuthenticationBackend):
 
 # Регистрируем модели
 class UserAdmin(ModelView, model=User):
-    """User admin panel"""
-    column_list = [
-        User.id,
-        User.username,
-        User.email,
-        User.is_active,
-        User.is_superuser,
-        User.is_verified,
-        User.role,
-        User.member_of_team,
-        User.created_at,
-    ]
+    """вкладка для User"""
+    column_list = [User.id,
+                   User.username,
+                   User.email,
+                   User.is_active,
+                   User.is_superuser,
+                   User.is_verified,
+                   User.role,
+                   User.member_of_team,
+                   User.created_at,]
 
-    column_searchable_list = [
-        User.username,
-        User.email
-    ]
+    column_searchable_list = [User.username,
+                              User.email]
 
-    column_sortable_list = [
-        User.id,
-        User.username
-    ]
+    column_sortable_list = [User.id,
+                            User.username]
 
-    form_columns = [
-        User.username,
-        User.email,
-        "password",
-        User.is_active,
-        User.is_superuser,
-        User.is_verified,
-        User.role,
-        User.member_of_team,
-    ]
+    form_columns = [User.username,
+                    User.email,
+                    "password",
+                    User.is_active,
+                    User.is_superuser,
+                    User.is_verified,
+                    User.role,
+                    User.member_of_team,]
 
     column_formatters = {
         User.created_at: lambda m, a: (
@@ -81,7 +79,8 @@ class UserAdmin(ModelView, model=User):
                 form_class, "password",
                 PasswordField(
                     "Password",
-                    render_kw={"class": "form-control", "id": "password"}
+                    render_kw={"class": "form-control",
+                               "id": "password"}
                 )
             )
         return form_class
@@ -109,15 +108,13 @@ class UserAdmin(ModelView, model=User):
 
 
 class TeamAdmin(ModelView, model=Team):
-    """Team admin panel"""
-    column_list = [
-        Team.team_id,
-        Team.team_name,
-        Team.admin,
-        Team.members,
-        Team.invite_code,
-        Team.created_at,
-    ]
+    """вкладка для Team"""
+    column_list = [Team.team_id,
+                   Team.team_name,
+                   Team.admin,
+                   Team.members,
+                   Team.invite_code,
+                   Team.created_at,]
 
     column_formatters = {
         Team.created_at: lambda m, a: (
@@ -127,17 +124,15 @@ class TeamAdmin(ModelView, model=Team):
 
 
 class TaskAdmin(ModelView, model=Task):
-    """Task admin panel"""
-    column_list = [
-        Task.task_id,
-        Task.task_name,
-        Task.status,
-        Task.executor,
-        Task.checker,
-        Task.team,
-        Task.deadline,
-        Task.evaluations
-    ]
+    """вкладка для Task"""
+    column_list = [Task.task_id,
+                   Task.task_name,
+                   Task.status,
+                   Task.executor,
+                   Task.checker,
+                   Task.team,
+                   Task.deadline,
+                   Task.evaluations]
 
     column_formatters = {
         Task.executor: lambda obj, request: obj.executor.username if obj.executor else "—",
@@ -157,14 +152,12 @@ class TaskAdmin(ModelView, model=Task):
 
 
 class MeetingAdmin(ModelView, model=Meeting):
-    """Meeting admin panel"""
-    column_list = [
-        Meeting.meeting_id,
-        Meeting.meeting_name,
-        Meeting.meeting_admin,
-        Meeting.meeting_date,
-        Meeting.duration_minutes,
-    ]
+    """вкладка для Meeting"""
+    column_list = [Meeting.meeting_id,
+                   Meeting.meeting_name,
+                   Meeting.meeting_admin,
+                   Meeting.meeting_date,
+                   Meeting.duration_minutes]
 
     column_formatters = {
         Meeting.meeting_date: lambda m, a: (
@@ -175,14 +168,12 @@ class MeetingAdmin(ModelView, model=Meeting):
 
 
 class EvaluationAdmin(ModelView, model=Evaluation):
-    """Evaluation admin panel"""
-    column_list = [
-        Evaluation.evaluation_id,
-        Evaluation.evaluation_value,
-        Evaluation.task,
-        Evaluation.evaluator,
-        Evaluation.created_at
-    ]
+    """вкладка для Evaluation"""
+    column_list = [Evaluation.evaluation_id,
+                   Evaluation.evaluation_value,
+                   Evaluation.task,
+                   Evaluation.evaluator,
+                   Evaluation.created_at]
 
     column_formatters = {
         Evaluation.task: lambda obj, request: obj.task.task_name if obj.task else "—",
@@ -193,22 +184,19 @@ class EvaluationAdmin(ModelView, model=Evaluation):
     }
 
     column_searchable_list = [Evaluation.evaluation_value]
-    column_sortable_list = [
-        Evaluation.evaluation_id,
-        Evaluation.evaluation_value,
-        Evaluation.created_at
-    ]
+
+    column_sortable_list = [Evaluation.evaluation_id,
+                            Evaluation.evaluation_value,
+                            Evaluation.created_at]
 
 
 class CommentAdmin(ModelView, model=Comment):
-    """Comment admin panel"""
-    column_list = [
-        Comment.comment_id,
-        Comment.content,
-        Comment.task,
-        Comment.author,
-        Comment.created_at
-    ]
+    """вкладка для Comment"""
+    column_list = [Comment.comment_id,
+                   Comment.content,
+                   Comment.task,
+                   Comment.author,
+                   Comment.created_at]
 
     column_formatters = {
         Comment.task: lambda obj, request: obj.task.task_name if obj.task else "—",
