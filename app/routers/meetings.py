@@ -1,13 +1,11 @@
 """роутеры для встреч"""
-# TODO две строки между классами
-
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from datetime import datetime
 from app.database.database import get_async_session
 from app.database.models import User, RoleEnum
-from app.users import current_active_user
+from app.fastapi_users import current_active_user
 from app.schemas import MeetingCreate, MeetingRead
 from app.database.repository import meeting_repo, user_repo
 
@@ -166,7 +164,7 @@ async def update_meeting(
         participants.append(user)
 
     # проверка конфликтов
-    conflict_meetings = meeting_repo.check_meeting_conflicts(
+    conflict_meetings = await meeting_repo.check_meeting_conflicts(
         db,
         meeting_update.participant_ids,
         meeting_update.meeting_date,
@@ -176,7 +174,7 @@ async def update_meeting(
 
     if conflict_meetings:
         conflict_info = []
-        for conflict in conflict_info:
+        for conflict in conflict_meetings:
             for user in conflict.participants:
                 if user.id in meeting_update.participant_ids:
                     conflict_info.append(f"User {user.username} has conflict meeting: {conflict.meeting_name}")
@@ -196,7 +194,7 @@ async def update_meeting(
     }
 
     updated_meeting = await meeting_repo.update_meeting(db, meeting_id, meeting_data)
-    return [MeetingRead.model_validate(updated_meeting)]
+    return MeetingRead.model_validate(updated_meeting)
 
 
 @router.delete("/{meeting_id}")

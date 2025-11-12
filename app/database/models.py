@@ -1,8 +1,5 @@
 """ Модели данных для заполнения базы """
-# TODO две строки между классами
-
-# комментарии для визуального разделения частей моделей
-
+from fastapi_users_db_sqlalchemy import SQLAlchemyBaseUserTable
 from sqlalchemy import (Table,
                         Column,
                         Integer,
@@ -44,7 +41,7 @@ class TaskStatusEnum(str, enum.Enum):
     completed = "completed"
 
 
-class User(Base):
+class User(SQLAlchemyBaseUserTable[int], Base):
     """main info"""
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True, unique=True)
@@ -75,12 +72,11 @@ class User(Base):
         return self.username
 
     def _get_password(self) -> str:
-        return ""
+        return self.hashed_password
 
     def _set_password(self, raw_password: str) -> None:
-        if not raw_password:
-            return
-        self.hashed_password = _password_helper.hash(raw_password)
+        if raw_password:
+            self.hashed_password = _password_helper.hash(raw_password)
 
     password = synonym("hashed_password", descriptor=property(_get_password, _set_password))
 

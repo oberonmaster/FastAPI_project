@@ -3,7 +3,7 @@ from fastapi import Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.database import get_async_session
 from app.database.models import User, Team, RoleEnum
-from app.users import current_active_user
+from app.fastapi_users import current_active_user
 
 
 async def get_admin_user(current_user: User = Depends(current_active_user)):
@@ -60,4 +60,14 @@ async def verify_team_member(
             detail="Not a member of this team"
         )
 
+    return current_user
+
+
+async def get_evaluation_access_user(current_user: User = Depends(current_active_user)):
+    """Получить пользователя с доступом к оценкам"""
+    if current_user.role not in [RoleEnum.admin, RoleEnum.team_admin, RoleEnum.manager]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions to access evaluations"
+        )
     return current_user

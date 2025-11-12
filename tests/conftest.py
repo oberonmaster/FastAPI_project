@@ -10,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 from main import app
 from app.database.database import Base, get_async_session
 from app.database.models import User
-from app.users import get_user_db
+from app.fastapi_users import get_user_db
 from fastapi_users.db import SQLAlchemyUserDatabase
 from fastapi_users.password import PasswordHelper
 

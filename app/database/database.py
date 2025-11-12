@@ -1,11 +1,11 @@
 """ Интерфейс настройки базы данных и подключения """
-# TODO две строки между классами
-
 import os
 
 from dotenv import load_dotenv
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.ext.asyncio import (create_async_engine,
+                                    AsyncSession,
+                                    async_sessionmaker)
+from sqlalchemy.orm import declarative_base
 from typing import AsyncGenerator
 from contextlib import asynccontextmanager
 from fastapi_users.db import SQLAlchemyUserDatabase
@@ -25,7 +25,8 @@ engine = create_async_engine(DATABASE_URL,
                              future=True,
                              echo=False)
 
-async_session_maker = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+async_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
 
 @asynccontextmanager
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:

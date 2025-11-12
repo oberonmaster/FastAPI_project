@@ -1,8 +1,6 @@
 """
 
 """
-# TODO две строки между классами
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
@@ -10,7 +8,7 @@ import secrets
 from app.database.database import get_async_session
 from app.database.models import User, RoleEnum
 from app.database.repository import team_repo, user_repo
-from app.users import current_active_user
+from app.fastapi_users import current_active_user
 from app.schemas import TeamCreate, TeamRead
 from app.dependencies import get_team_admin_user
 
@@ -77,12 +75,14 @@ async def get_team(
 ):
     """ получение команды по id"""
     team = await team_repo.get_team_by_id(db, team_id)
+    # TODO вынести в отдельный handler
     if not team:
         raise HTTPException(
             status_code=404,
             detail="Team not found"
         )
 
+    # TODO вынести в отдельный handler
     if (current_user.role != RoleEnum.admin and
             current_user.member_of_team != team_id and
             current_user.id != team.team_admin):
@@ -103,12 +103,15 @@ async def update_team(
 ):
     """обновление команды"""
     team = await team_repo.get_team_by_id(db, team_id)
+
+    # TODO вынести в отдельный handler
     if not team:
         raise HTTPException(
             status_code=404,
             detail="Team not found"
         )
 
+    # TODO вынести в отдельный handler
     if current_user.role != RoleEnum.admin and current_user.id != team.team_admin:
         raise HTTPException(
             status_code=403,
@@ -131,12 +134,14 @@ async def delete_team(
 ):
     """удаление команды"""
     team = await team_repo.get_team_by_id(db, team_id)
+    # TODO вынести в отдельный handler
     if not team:
         raise HTTPException(
             status_code=404,
             detail="Team not found"
         )
 
+    # TODO вынести в отдельный handler
     if current_user.role != RoleEnum.admin and current_user.id != team.team_admin:
         raise HTTPException(
             status_code=403,
@@ -155,12 +160,14 @@ async def generate_new_invite(
 ):
     """генерация нового приглашения"""
     team = await team_repo.get_team_by_id(db, team_id)
+    # TODO вынести в отдельный handler
     if not team:
         raise HTTPException(
             status_code=404,
             detail="Team not found"
         )
 
+    # TODO вынести в отдельный handler
     if current_user.role != RoleEnum.admin and current_user.id != team.team_admin:
         raise HTTPException(
             status_code=403,
@@ -191,12 +198,14 @@ async def remove_user_from_team(
 ):
     """исключение пользователя из команды"""
     team = await team_repo.get_team_by_id(db, team_id)
+    # TODO вынести в отдельный handler
     if not team:
         raise HTTPException(
             status_code=404,
             detail="Team not found"
         )
 
+    # TODO вынести в отдельный handler
     if current_user.role != RoleEnum.admin and current_user.id != team.team_admin:
         raise HTTPException(
             status_code=403,
@@ -205,6 +214,7 @@ async def remove_user_from_team(
 
     user_to_remove = await team_repo.get_team_by_id(db, user_id)
 
+    # TODO вынести в отдельный handler
     if not user_to_remove or user_to_remove.member_of_team != team_id:
         raise HTTPException(
             status_code=404,

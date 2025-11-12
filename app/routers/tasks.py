@@ -11,7 +11,7 @@ from typing import List, Optional
 from app.database.database import get_async_session
 from app.database.models import User, RoleEnum, TaskStatusEnum
 from app.database.repository import user_repo, task_repo, comment_repo
-from app.users import current_active_user
+from app.fastapi_users import current_active_user
 from app.schemas import TaskCreate, TaskRead, CommentCreate, CommentRead
 
 
@@ -71,7 +71,7 @@ async def get_tasks(
 ):
     """получение списка задач"""
     if current_user.role in [RoleEnum.admin]:
-        tasks = await task_repo.get_tasks_by_filters(db,skip,limit,status)
+        tasks = await task_repo.get_tasks_by_filters(db, skip, limit,status)
     elif current_user.role in [RoleEnum.team_admin, RoleEnum.manager]:
         tasks = await task_repo.get_tasks_by_filters(db, skip, limit, status, current_user.member_of_team)
     else:
@@ -112,26 +112,13 @@ async def update_task(
         db: AsyncSession = Depends(get_async_session)
 ):
     """обновление задачи"""
-    task = await task_repo.get_task_by_id(db, task_id)
-    if not task:
-        raise HTTPException(
-            status_code=404,
-            detail="Task not found"
-        )
+    task_data = task_update.dict(exclude_unset=True)
 
-    if (current_user.role not in [RoleEnum.admin, RoleEnum.team_admin, RoleEnum.manager] and
-            task.task_checker != current_user.id):
-        raise HTTPException(
-            status_code=403,
-            detail="Not enough permissions"
-        )
+    updated_task = await task_repo.update_task(db, task_id, task_data)
+    if not updated_task:
+        raise HTTPException(status_code=404, detail="Task not found or update failed")
 
-    for field, value in task_update.dict(exclude_unset=True).items():
-        setattr(task, field, value)
-
-    await db.commit()
-    await db.refresh(task)
-    return TaskRead.model_validate(task)
+    return TaskRead.model_validate(updated_task)
 
 
 @router.patch("/{task_id}/status")
@@ -144,18 +131,14 @@ async def update_task_status(
     """обновление статуса задачи"""
     task = await task_repo.get_task_by_id(db, task_id)
     if not task:
-        raise HTTPException(
-            status_code=404,
-            detail="Task not found"
-        )
+        raise HTTPException(status_code=404, detail="Task not found")
 
     if task.task_executor != current_user.id and task.task_checker != current_user.id:
-        raise HTTPException(
-            status_code=403,
-            detail="Not enough permissions"
-        )
+        raise HTTPException(status_code=403, detail="Not enough permissions")
 
     updated_task = await task_repo.update_task_status(db, task_id, status)
+    if not updated_task:
+        raise HTTPException(status_code=500, detail="Failed to update task status")
 
     return {"message": f"Task status updated to {status}"}
 
@@ -167,22 +150,10 @@ async def delete_task(
         db: AsyncSession = Depends(get_async_session)
 ):
     """отмена задачи"""
-    task = await task_repo.get_task_by_id(db, task_id)
+    success = await task_repo.delete_task(db, task_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Task not found or delete failed")
 
-    if not task:
-        raise HTTPException(
-            status_code=404,
-            detail="Task not found"
-        )
-
-    if current_user.role not in [RoleEnum.admin, RoleEnum.team_admin]:
-        raise HTTPException(
-            status_code=403,
-            detail="Not enough permissions"
-        )
-
-    await db.delete(task)
-    await db.commit()
     return {"message": "Task deleted successfully"}
 
 

@@ -154,8 +154,7 @@ class TokenResponse(BaseModel):
 
 class CalendarEventBase(BaseModel):
     """Базовая схема для событий календаря"""
-    # TODO проверить типы
-    id: str
+    id: str # Составной идентификатор: "task_123" или "meeting_456" для различения типов событий
     title: str
     start: str
     type: str

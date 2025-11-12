@@ -1,15 +1,13 @@
 """
 
 """
-# TODO две строки между классами
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from app.database.database import get_async_session
 from app.database.models import User, RoleEnum
 from app.database.repository import user_repo, team_repo
-from app.users import current_active_user
+from app.fastapi_users import current_active_user
 from app.schemas import UserRead, UserUpdate
 
 
@@ -21,6 +19,7 @@ async def get_me(user: User = Depends(current_active_user)):
     return UserRead.model_validate(user)
 
 
+# TODO убрать в репозиторий
 @router.put("/me", response_model=UserRead)
 async def update_me(
         user_update: UserUpdate,
@@ -82,7 +81,6 @@ async def leave_team(
         current_user: User = Depends(current_active_user)
 ):
     """покинуть группу"""
-
     if not current_user.member_of_team:
         raise HTTPException(
             status_code=400,

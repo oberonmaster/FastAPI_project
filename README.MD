@@ -64,7 +64,7 @@
 │   │   ├── teams.py          # Управление командами
 │   │   └── users.py          # Пользователи и профиль
 │   ├── schemas.py            # Pydantic схемы
-│   └── users.py              # FastAPI-users конфигурация
+│   └── fastapi_users.py      # FastAPI-users конфигурация
 ├── main.py                   # Точка входа приложения
 └── requirements.txt          # Зависимости
 ```
