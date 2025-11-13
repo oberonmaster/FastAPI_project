@@ -14,30 +14,6 @@ from app.schemas import UserRead, UserUpdate
 router = APIRouter(prefix="/api/users", tags=["users"])
 
 
-@router.get("/me", response_model=UserRead)
-async def get_me(user: User = Depends(current_active_user)):
-    return UserRead.model_validate(user)
-
-
-# TODO убрать в репозиторий
-@router.put("/me", response_model=UserRead)
-async def update_me(
-        user: User = Depends(current_active_user),
-        db: AsyncSession = Depends(get_async_session)
-):
-    """ обновление информации пользователя"""
-    update_data = {'exclude_unset': True}
-    allowed_fields = ['username']
-
-    for field in allowed_fields:
-        if field in update_data:
-            setattr(user, field, update_data[field])
-
-    await db.commit()
-    await db.refresh(user)
-    return UserRead.model_validate(user)
-
-
 @router.get("/", response_model=List[UserRead])
 async def get_users(
         skip: int = 0,

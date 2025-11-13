@@ -201,7 +201,6 @@ class UserRepository:
             user.member_of_team = team_id
             await db.commit()
             await db.refresh(user)
-
         return user
 
 
