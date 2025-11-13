@@ -1,6 +1,7 @@
 """Репозиторий для работы с базой данных"""
 from datetime import datetime, date, timedelta
-from typing import List, Optional
+from typing import List, Optional, Any, Sequence
+from sqlalchemy import Row, RowMapping
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.database.models import Task, Meeting, Evaluation, Comment, Team, User
@@ -10,11 +11,12 @@ from app.services.database_error_handler import db_error_handler
 class CalendarRepository:
     """Репозиторий календаря"""
     @staticmethod
-    async def get_user_tasks_by_date_range(db: AsyncSession,user_id: int,start_date: date,end_date: date) -> List[Task]:
+    async def get_user_tasks_by_date_range(db: AsyncSession,user_id: int,start_date: date,end_date: date) -> Sequence[
+        Task]:
         """Получить задачи пользователя по диапазону дат"""
         result = await db.execute(
             select(Task).where(
-                Task.task_executor == user_id,
+                user_id == Task.task_executor,
                 Task.deadline >= start_date,
                 Task.deadline <= end_date
             )
@@ -22,7 +24,8 @@ class CalendarRepository:
         return result.scalars().all()
 
     @staticmethod
-    async def get_user_meetings_by_date_range(db: AsyncSession,user_id: int,start_date: date,end_date: date) -> List[Meeting]:
+    async def get_user_meetings_by_date_range(db: AsyncSession,user_id: int,start_date: date,end_date: date) -> \
+    Sequence[Meeting]:
         """Получить встречи пользователя по диапазону дат"""
         result = await db.execute(
             select(Meeting).where(
@@ -43,7 +46,7 @@ class EvaluationRepository:
 
         result = await db.execute(
             select(Evaluation).join(Evaluation.task).where(
-                Task.task_executor == user_id,
+                user_id == Task.task_executor,
                 Evaluation.created_at >= start_date
             )
         )
@@ -62,14 +65,15 @@ class EvaluationRepository:
         }
 
     @staticmethod
-    async def get_evaluations_by_filters(db: AsyncSession,skip: int = 0,limit: int = 100,task_id: Optional[int] = None,user_id: Optional[int] = None) -> List[Evaluation]:
+    async def get_evaluations_by_filters(db: AsyncSession,skip: int = 0,limit: int = 100,task_id: Optional[int] = None,user_id: Optional[int] = None) -> \
+    Sequence[Row[Any] | RowMapping | Any]:
         """Получение оценки по фильтрам"""
         query = select(Evaluation)
 
         if task_id:
-            query = query.where(Evaluation.task_id == task_id)
+            query = query.where(task_id == Evaluation.task_id)
         if user_id:
-            query = query.where(Evaluation.evaluator_id == user_id)
+            query = query.where(user_id == Evaluation.evaluator_id)
 
         result = await db.execute(query.offset(skip).limit(limit))
         return result.scalars().all()
@@ -80,19 +84,21 @@ class EvaluationRepository:
             evaluation_id: int
     ) -> Optional[Evaluation]:
         """Получение оценки по ее id"""
-        result = await db.execute(select(Evaluation).where(Evaluation.evaluation_id == evaluation_id))
+        result = await db.execute(select(Evaluation).where(evaluation_id == Evaluation.evaluation_id))
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def get_user_evaluations(db: AsyncSession,user_id: int) -> List[Evaluation]:
+    async def get_user_evaluations(db: AsyncSession,user_id: int) -> Sequence[Row[Any] | RowMapping | Any]:
         """Получение оценок пользователя"""
-        result = await db.execute(select(Evaluation).join(Evaluation.task).where(Task.task_executor == user_id).order_by(Evaluation.created_at.desc()))
+        result = await db.execute(select(Evaluation).join(Evaluation.task).where(
+            user_id == Task.task_executor).order_by(Evaluation.created_at.desc()))
         return result.scalars().all()
 
     @staticmethod
     async def check_duplicate_evaluations(db: AsyncSession,task_id: int,evaluator_id: int) -> bool:
         """проверка дублей"""
-        result = await db.execute(select(Evaluation).where(Evaluation.task_id == task_id,Evaluation.evaluator_id == evaluator_id))
+        result = await db.execute(select(Evaluation).where(task_id == Evaluation.task_id,
+                                                           evaluator_id == Evaluation.evaluator_id))
         return result.scalar_one_or_none()
 
     @staticmethod
@@ -114,16 +120,17 @@ class EvaluationRepository:
 class TaskRepository:
     """Репозиторий для задач"""
     @staticmethod
-    async def get_tasks_by_filters(db: AsyncSession,skip: int = 0,limit: int = 100,status: Optional[str] = None,team_id: Optional[int] = None,user_id: Optional[int] = None) -> List[Task]:
+    async def get_tasks_by_filters(db: AsyncSession,skip: int = 0,limit: int = 100,status: Optional[str] = None,team_id: Optional[int] = None,user_id: Optional[int] = None) -> \
+    Sequence[Row[Any] | RowMapping | Any]:
         """получение задачи по фильтру"""
         query = select(Task)
 
         if status:
-            query = query.where(Task.status == status)
+            query = query.where(status == Task.status)
         if team_id:
-            query = query.where(Task.team_id == team_id)
+            query = query.where(team_id == Task.team_id)
         if user_id:
-            query = query.where(Task.task_executor == user_id)
+            query = query.where(user_id == Task.task_executor)
 
         result = await db.execute(query.offset(skip).limit(limit))
         return result.scalars().all()
@@ -131,15 +138,15 @@ class TaskRepository:
     @staticmethod
     async def get_task_by_id(db: AsyncSession,task_id: int) -> Optional[Task]:
         """Получение задачи по id"""
-        result = await db.execute(select(Task).where(Task.task_id == task_id))
+        result = await db.execute(select(Task).where(task_id == Task.task_id))
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def get_user_tasks(db: AsyncSession,user_id: int) -> List[Task]:
+    async def get_user_tasks(db: AsyncSession,user_id: int) -> Sequence[Row[Any] | RowMapping | Any]:
         """Поллучение задачи пользователя"""
         result = await db.execute(
             select(Task).where(
-                (Task.task_executor == user_id) | (Task.task_checker == user_id)
+                (user_id == Task.task_executor) | (Task.task_checker == user_id)
             )
         )
         return result.scalars().all()
@@ -172,7 +179,7 @@ class UserRepository:
             db: AsyncSession,
             skip: int = 0,
             limit: int = 100
-    ) -> List[User]:
+    ) -> Sequence[User]:
         """получение данных пользователя"""
         result = await db.execute(select(User).offset(skip).limit(limit))
         return result.scalars().all()
@@ -183,7 +190,7 @@ class UserRepository:
             user_id: int
     ) -> Optional[User]:
         """получения данных пользователя по id"""
-        result = await db.execute(select(User).where(User.id == user_id))
+        result = await db.execute(select(User).where(user_id == User.id))
         return result.scalar_one_or_none()
 
     @staticmethod
@@ -201,7 +208,7 @@ class UserRepository:
 class TeamRepository:
     """Репозиторий для команд"""
     @staticmethod
-    async def get_teams(db: AsyncSession,skip: int = 0,limit: int = 100) -> List[Team]:
+    async def get_teams(db: AsyncSession,skip: int = 0,limit: int = 100) -> Sequence[Team]:
         """получение информации о команде"""
         result = await db.execute(select(Team).offset(skip).limit(limit))
         return result.scalars().all()
@@ -210,14 +217,14 @@ class TeamRepository:
     @staticmethod
     async def get_team_by_id(db: AsyncSession,team_id: int) -> Optional[Team]:
         """получение информации о команде по ее id"""
-        result = await db.execute(select(Team).where(Team.team_id == team_id))
+        result = await db.execute(select(Team).where(team_id == Team.team_id))
         return result.scalar_one_or_none()
 
 
     @staticmethod
     async def get_team_by_invite_code(db: AsyncSession,invite_code: str) -> Optional[Team]:
         """получение информации о команде по пригласительному коду"""
-        result = await db.execute(select(Team).where(Team.invite_code == invite_code))
+        result = await db.execute(select(Team).where(invite_code == Team.invite_code))
         return result.scalar_one_or_none()
 
 
@@ -242,7 +249,8 @@ class TeamRepository:
 class MeetingRepository:
     """Репозиторий для встреч"""
     @staticmethod
-    async def get_meetings_by_filters(db: AsyncSession,skip: int = 0,limit: int = 100,start_date: Optional[datetime] = None,end_date: Optional[datetime] = None,user_id: Optional[int] = None) -> List[Meeting]:
+    async def get_meetings_by_filters(db: AsyncSession,skip: int = 0,limit: int = 100,start_date: Optional[datetime] = None,end_date: Optional[datetime] = None,user_id: Optional[int] = None) -> \
+    Sequence[Meeting]:
         """ получение данных о встрече по фильтрам"""
         query = select(Meeting)
 
@@ -260,12 +268,12 @@ class MeetingRepository:
     @staticmethod
     async def get_meeting_by_id(db: AsyncSession, meeting_id: int) -> Optional[Meeting]:
         """получение данных о встрече по ее id"""
-        result = await db.execute(select(Meeting).where(Meeting.meeting_id == meeting_id))
+        result = await db.execute(select(Meeting).where(meeting_id == Meeting.meeting_id))
         return result.scalar_one_or_none()
 
 
     @staticmethod
-    async def get_user_meetings(db: AsyncSession,user_id: int) -> List[Meeting]:
+    async def get_user_meetings(db: AsyncSession,user_id: int) -> Sequence[Meeting]:
         """получение назначенных встреч для пользователя"""
         result = await db.execute(select(Meeting).
                                   where(Meeting.participants.any(id=user_id)).
@@ -298,7 +306,7 @@ class MeetingRepository:
         query = (select(Meeting).join(Meeting.participants).where(User.id.in_(user_ids)))
 
         if exclude_meeting_id:
-            query = query.where(Meeting.meeting_id != exclude_meeting_id)
+            query = query.where(exclude_meeting_id != Meeting.meeting_id)
             
         result = await db.execute(query)
         
@@ -322,9 +330,9 @@ class CommentRepository:
         return await db_error_handler.create_operation(db, Comment, comment_data)
 
     @staticmethod
-    async def get_comments_by_task_id(db: AsyncSession, task_id: int) -> List[Comment]:
+    async def get_comments_by_task_id(db: AsyncSession, task_id: int) -> Sequence[Row[Any] | RowMapping | Any]:
         """получение комментариев по id задачи"""
-        result = await db.execute(select(Comment).where(Comment.task_id == task_id))
+        result = await db.execute(select(Comment).where(task_id == Comment.task_id))
         return result.scalars().all()
     
 

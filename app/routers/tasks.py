@@ -1,10 +1,6 @@
 """
 
 """
-# TODO две строки между классами
-
-
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
@@ -107,12 +103,10 @@ async def get_task(
 @router.put("/{task_id}", response_model=TaskRead)
 async def update_task(
         task_id: int,
-        task_update: TaskCreate,
-        current_user: User = Depends(current_active_user),
         db: AsyncSession = Depends(get_async_session)
 ):
     """обновление задачи"""
-    task_data = task_update.dict(exclude_unset=True)
+    task_data = {'exclude_unset': True}
 
     updated_task = await task_repo.update_task(db, task_id, task_data)
     if not updated_task:
@@ -146,7 +140,6 @@ async def update_task_status(
 @router.delete("/{task_id}")
 async def delete_task(
         task_id: int,
-        current_user: User = Depends(current_active_user),
         db: AsyncSession = Depends(get_async_session)
 ):
     """отмена задачи"""

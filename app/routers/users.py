@@ -22,12 +22,11 @@ async def get_me(user: User = Depends(current_active_user)):
 # TODO убрать в репозиторий
 @router.put("/me", response_model=UserRead)
 async def update_me(
-        user_update: UserUpdate,
         user: User = Depends(current_active_user),
         db: AsyncSession = Depends(get_async_session)
 ):
     """ обновление информации пользователя"""
-    update_data = user_update.dict(exclude_unset=True)
+    update_data = {'exclude_unset': True}
     allowed_fields = ['username']
 
     for field in allowed_fields:

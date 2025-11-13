@@ -106,7 +106,6 @@ async def get_user_average_rating(
 async def get_evaluation(
         evaluation_id: int,
         current_user: User = Depends(current_active_user),
-        db: AsyncSession = Depends(get_async_session)
 ):
     """получение оценки"""
     evaluation = await evaluation_repo.get_evaluation_by_id(Evaluation, evaluation_id)
@@ -132,7 +131,6 @@ async def get_evaluation(
 async def update_evaluation(
     evaluation_id: int,
     evaluation_update: EvaluationCreate,
-    current_user: User = Depends(current_active_user),
     db: AsyncSession = Depends(get_async_session)
 ):
     """обновление оценки"""
@@ -152,7 +150,6 @@ async def update_evaluation(
 @router.delete("/{evaluation_id}")
 async def delete_evaluation(
     evaluation_id: int,
-    current_user: User = Depends(current_active_user),
     db: AsyncSession = Depends(get_async_session)
 ):
     """удаление оценки"""
