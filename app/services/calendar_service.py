@@ -80,3 +80,20 @@ async def get_day_utility(year: int,month: int,day: int,db: AsyncSession,current
     events.sort(key=lambda x: x.time)
 
     return DayCalendarResponse(date=target_date.isoformat(),events=events)
+
+#
+# async def get_upcoming_events_utility(
+#         db: AsyncSession,
+#         current_user: User,
+#         days: int = 7
+# ) -> List[Union[TaskEvent, MeetingEvent]]:
+#     """Получить предстоящие события для главной страницы"""
+#     start_date = datetime.now().date()
+#     end_date = start_date + timedelta(days=days)
+#
+#     events = await get_events_utility(db, current_user, start_date, end_date)
+#
+#     events.sort(key=lambda x: x.start)
+#
+#     return events[:10]
+#
