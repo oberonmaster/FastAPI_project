@@ -1,15 +1,44 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>root page</title>
+<meta charset="UTF-8">
+<title>Главная страница</title>
+<style>
+    body { font-family: Arial, sans-serif; margin: 40px; }
+    h1 { text-align: center; }
+    .section { margin-bottom: 30px; }
+    .meeting { color: red; font-weight: bold; }
+</style>
 </head>
 <body>
-    <ul/>
-        <button>users</button>
-        <button>teams</button>
-        <button>tasks</button>
-        <button>meetings</button>
-        <button>calendar</button>
+<h1>Главная страница</h1>
+
+<div class="section">
+    <h2>Users</h2>
+    <ul>
+        {% for user in users %}
+        <li>{{ user.id }} - {{ user.username }} ({{ user.email }})</li>
+        {% endfor %}
     </ul>
+</div>
+
+<div class="section">
+    <h2>Tasks</h2>
+    <ul>
+        {% for task in tasks %}
+        <li>{{ task.task_id }} - {{ task.title }} [{{ task.status }}]</li>
+        {% endfor %}
+    </ul>
+</div>
+
+<div class="section">
+    <h2>Meetings Calendar</h2>
+    <ul>
+        {% for meeting in meetings %}
+        <li class="meeting">{{ meeting.meeting_date.strftime('%Y-%m-%d %H:%M') }} - {{ meeting.title }}</li>
+        {% endfor %}
+    </ul>
+</div>
+
 </body>
 </html>

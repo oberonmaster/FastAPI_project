@@ -85,7 +85,7 @@ async def create_admin_user():
 
 async def get_user_db():
     """getting user from db"""
-    async with get_async_session() as session:
+    async for session in get_async_session():
         yield SQLAlchemyUserDatabase(session, User)
 
 

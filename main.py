@@ -5,15 +5,14 @@ import os
 from contextlib import asynccontextmanager
 import uvicorn
 from dotenv import load_dotenv
-from fastapi import FastAPI, APIRouter, Request
-from fastapi.templating import Jinja2Templates
+from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 from sqladmin import Admin
 from app.database.database import (engine,create_db_and_tables)
 from app.fastapi_users import fastapi_users,auth_backend, create_admin_user
 from app.schemas import (UserRead,UserCreate,UserUpdate)
 from app.admin import (SimpleAuth,UserAdmin,TeamAdmin,TaskAdmin,MeetingAdmin,EvaluationAdmin)
-from app.routers import (users,teams,tasks,meetings,evaluations,calendar)
+from app.routers import (users,teams,tasks,meetings,evaluations,calendar,index)
 
 
 load_dotenv()
@@ -48,7 +47,6 @@ async def lifespan(application: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-router = APIRouter()
 
 # Middleware
 app.add_middleware(SessionMiddleware,secret_key=SECRET_KEY,session_cookie="session")
@@ -69,24 +67,14 @@ app.include_router(evaluations.router)
 app.include_router(calendar.router)
 
 # Роутер главной страницы
-app.include_router(router)
-templates = Jinja2Templates(directory="app/templates")
-
-
-# TODO убрать куда нибудь в роутеры
-@app.get("/")
-def root_page(request: Request):
-    content = {
-
-    }
-    return templates.TemplateResponse("index.html",
-                                      {"request": request, **content})
+app.include_router(index.index_router)
 
 
 
 def main():
     """Запуск сервера"""
     uvicorn.run("main:app",host="0.0.0.0",port=8000,reload=True)
+
 
 if __name__ == "__main__":
     main()

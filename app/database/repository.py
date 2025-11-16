@@ -16,7 +16,7 @@ class CalendarRepository:
         """Получить задачи пользователя по диапазону дат"""
         result = await db.execute(
             select(Task).where(
-                user_id == Task.task_executor,
+                Task.task_executor == user_id,
                 Task.deadline >= start_date,
                 Task.deadline <= end_date
             )
@@ -44,12 +44,7 @@ class EvaluationRepository:
         """Получить средний рейтинг пользователя (исправленная версия)"""
         start_date = datetime.now() - timedelta(days=period_days)
 
-        result = await db.execute(
-            select(Evaluation).join(Evaluation.task).where(
-                user_id == Task.task_executor,
-                Evaluation.created_at >= start_date
-            )
-        )
+        result = await db.execute(select(Evaluation).join(Evaluation.task).where(Task.task_executor == user_id,Evaluation.created_at >= start_date))
         evaluations = result.scalars().all()
 
         if not evaluations:
@@ -71,34 +66,46 @@ class EvaluationRepository:
         query = select(Evaluation)
 
         if task_id:
-            query = query.where(task_id == Evaluation.task_id)
+            query = query.where(Evaluation.task_id == task_id)
         if user_id:
-            query = query.where(user_id == Evaluation.evaluator_id)
+            query = query.where(Evaluation.evaluator_id == user_id)
 
         result = await db.execute(query.offset(skip).limit(limit))
         return result.scalars().all()
 
     @staticmethod
     async def get_evaluation_by_id(
-            db: AsyncSession,
-            evaluation_id: int
+        db: AsyncSession,
+        evaluation_id: int
     ) -> Optional[Evaluation]:
         """Получение оценки по ее id"""
-        result = await db.execute(select(Evaluation).where(evaluation_id == Evaluation.evaluation_id))
+        result = await db.execute(select(Evaluation).where(Evaluation.evaluation_id == evaluation_id))
         return result.scalar_one_or_none()
 
     @staticmethod
     async def get_user_evaluations(db: AsyncSession,user_id: int) -> Sequence[Row[Any] | RowMapping | Any]:
         """Получение оценок пользователя"""
-        result = await db.execute(select(Evaluation).join(Evaluation.task).where(
-            user_id == Task.task_executor).order_by(Evaluation.created_at.desc()))
+        result = await db.execute(
+            select(Evaluation)
+            .join(Evaluation.task)
+            .where(Task.task_executor == user_id)
+            .order_by(Evaluation.created_at.desc())
+        )
         return result.scalars().all()
 
     @staticmethod
-    async def check_duplicate_evaluations(db: AsyncSession,task_id: int,evaluator_id: int) -> bool:
-        """проверка дублей"""
-        result = await db.execute(select(Evaluation).where(task_id == Evaluation.task_id,
-                                                           evaluator_id == Evaluation.evaluator_id))
+    async def check_duplicate_evaluations(
+        db: AsyncSession,
+        task_id: int,
+        evaluator_id: int
+    ) -> bool:
+        """Проверка дублей"""
+        result = await db.execute(
+            select(Evaluation).where(
+                Evaluation.task_id == task_id,
+                Evaluation.evaluator_id == evaluator_id
+            )
+        )
         return result.scalar_one_or_none()
 
     @staticmethod
@@ -126,33 +133,33 @@ class TaskRepository:
         query = select(Task)
 
         if status:
-            query = query.where(status == Task.status)
+            query = query.where(Task.status == status)
         if team_id:
-            query = query.where(team_id == Task.team_id)
+            query = query.where(Task.team_id == team_id)
         if user_id:
-            query = query.where(user_id == Task.task_executor)
+            query = query.where(Task.task_executor == user_id)
 
         result = await db.execute(query.offset(skip).limit(limit))
         return result.scalars().all()
 
     @staticmethod
-    async def get_task_by_id(db: AsyncSession,task_id: int) -> Optional[Task]:
+    async def get_task_by_id(db: AsyncSession, task_id: int) -> Optional[Task]:
         """Получение задачи по id"""
-        result = await db.execute(select(Task).where(task_id == Task.task_id))
+        result = await db.execute(select(Task).where(Task.task_id == task_id))
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def get_user_tasks(db: AsyncSession,user_id: int) -> Sequence[Row[Any] | RowMapping | Any]:
-        """Поллучение задачи пользователя"""
+    async def get_user_tasks(db: AsyncSession, user_id: int) -> Sequence[Row[Any] | RowMapping | Any]:
+        """Получение задач пользователя"""
         result = await db.execute(
             select(Task).where(
-                (user_id == Task.task_executor) | (Task.task_checker == user_id)
+                (Task.task_executor == user_id) | (Task.task_checker == user_id)
             )
         )
         return result.scalars().all()
 
     @staticmethod
-    async def creaate_task(db: AsyncSession,task_data: dict) -> Task:
+    async def creaate_task(db: AsyncSession, task_data: dict) -> Task:
         """Создание новой задачи"""
         return await db_error_handler.create_operation(db, Task, task_data)
 
@@ -185,17 +192,14 @@ class UserRepository:
         return result.scalars().all()
 
     @staticmethod
-    async def get_user_by_id(
-            db: AsyncSession,
-            user_id: int
-    ) -> Optional[User]:
-        """получения данных пользователя по id"""
-        result = await db.execute(select(User).where(user_id == User.id))
+    async def get_user_by_id(db: AsyncSession, user_id: int) -> Optional[User]:
+        """Получение данных пользователя по id"""
+        result = await db.execute(select(User).where(User.id == user_id))
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def update_user_team(db: AsyncSession,user_id: int,team_id: Optional[int]) -> Optional[User]:
-        """привязка пользователя к команде"""
+    async def update_user_team(db: AsyncSession, user_id: int, team_id: Optional[int]) -> Optional[User]:
+        """Привязка пользователя к команде"""
         user = await UserRepository.get_user_by_id(db, user_id)
         if user:
             user.member_of_team = team_id
@@ -207,37 +211,34 @@ class UserRepository:
 class TeamRepository:
     """Репозиторий для команд"""
     @staticmethod
-    async def get_teams(db: AsyncSession,skip: int = 0,limit: int = 100) -> Sequence[Team]:
-        """получение информации о команде"""
+    async def get_teams(db: AsyncSession, skip: int = 0, limit: int = 100) -> Sequence[Team]:
+        """Получение информации о команде"""
         result = await db.execute(select(Team).offset(skip).limit(limit))
         return result.scalars().all()
 
-
     @staticmethod
-    async def get_team_by_id(db: AsyncSession,team_id: int) -> Optional[Team]:
-        """получение информации о команде по ее id"""
-        result = await db.execute(select(Team).where(team_id == Team.team_id))
+    async def get_team_by_id(db: AsyncSession, team_id: int) -> Optional[Team]:
+        """Получение информации о команде по ее id"""
+        result = await db.execute(select(Team).where(Team.team_id == team_id))
         return result.scalar_one_or_none()
 
-
     @staticmethod
-    async def get_team_by_invite_code(db: AsyncSession,invite_code: str) -> Optional[Team]:
-        """получение информации о команде по пригласительному коду"""
-        result = await db.execute(select(Team).where(invite_code == Team.invite_code))
+    async def get_team_by_invite_code(db: AsyncSession, invite_code: str) -> Optional[Team]:
+        """Получение информации о команде по пригласительному коду"""
+        result = await db.execute(select(Team).where(Team.invite_code == invite_code))
         return result.scalar_one_or_none()
 
-
     @staticmethod
-    async def create_team(db: AsyncSession,team_data: dict) -> Team:
-        """создание новой команды"""
+    async def create_team(db: AsyncSession, team_data: dict) -> Team:
+        """Создание новой команды"""
         return await db_error_handler.create_operation(db, Team, team_data)
 
-
     @staticmethod
-    async def update_team(db: AsyncSession,team_id: int,team_data: dict) -> Optional[Team]:
-        """обновление данных о команде"""
-        return await db_error_handler.update_operation(db,TeamRepository.get_team_by_id,team_id,team_data)
-
+    async def update_team(db: AsyncSession, team_id: int, team_data: dict) -> Optional[Team]:
+        """Обновление данных о команде"""
+        return await db_error_handler.update_operation(
+            db, TeamRepository.get_team_by_id, team_id, team_data
+        )
 
     @staticmethod
     async def delete_team(db: AsyncSession,team_id: int) -> bool:
@@ -263,13 +264,11 @@ class MeetingRepository:
         result = await db.execute(query.offset(skip).limit(limit))
         return result.scalars().all()
 
-
     @staticmethod
     async def get_meeting_by_id(db: AsyncSession, meeting_id: int) -> Optional[Meeting]:
-        """получение данных о встрече по ее id"""
-        result = await db.execute(select(Meeting).where(meeting_id == Meeting.meeting_id))
+        """Получение данных о встрече по ее id"""
+        result = await db.execute(select(Meeting).where(Meeting.meeting_id == meeting_id))
         return result.scalar_one_or_none()
-
 
     @staticmethod
     async def get_user_meetings(db: AsyncSession,user_id: int) -> Sequence[Meeting]:
@@ -279,12 +278,10 @@ class MeetingRepository:
                                   order_by(Meeting.meeting_date))
         return result.scalars().all()
 
-
     @staticmethod
-    async def create_meeting(db: AsyncSession,meeting_data: dict) -> Optional[Meeting]:
-        """создание новой встречи"""
+    async def create_meeting(db: AsyncSession, meeting_data: dict) -> Optional[Meeting]:
+        """Создание новой встречи"""
         return await db_error_handler.create_operation(db, Meeting, meeting_data)
-
 
     @staticmethod
     async def update_meeting(db: AsyncSession,meeting_id: int,meeting_data: dict) -> Optional[Meeting]:
@@ -302,40 +299,38 @@ class MeetingRepository:
     async def check_meeting_conflicts(db: AsyncSession,user_ids: List[int],meeting_date: datetime,duration_minutes: int,exclude_meeting_id: Optional[int] = None) -> List[Meeting]:
         """проверка пересечения встреч"""
         meeting_end = meeting_date + timedelta(minutes=duration_minutes)
-        query = (select(Meeting).join(Meeting.participants).where(User.id.in_(user_ids)))
+        query = select(Meeting).join(Meeting.participants).where(User.id.in_(user_ids))
 
         if exclude_meeting_id:
-            query = query.where(exclude_meeting_id != Meeting.meeting_id)
-            
+            query = query.where(Meeting.meeting_id != exclude_meeting_id)
+
         result = await db.execute(query)
-        
         all_meetings = result.scalars().all()
 
         conflict_meetings = []
-        
         for meeting in all_meetings:
             existing_end = meeting.meeting_date + timedelta(minutes=meeting.duration_minutes)
             if meeting_date < existing_end and meeting_end > meeting.meeting_date:
                 conflict_meetings.append(meeting)
 
         return conflict_meetings
-            
+
 
 class CommentRepository:
     """Репозиторий для комментариев"""
     @staticmethod
-    async def create_comment(db: AsyncSession,comment_data: dict) -> Comment:
-        """создать комментарий"""
+    async def create_comment(db: AsyncSession, comment_data: dict) -> Comment:
+        """Создать комментарий"""
         return await db_error_handler.create_operation(db, Comment, comment_data)
 
     @staticmethod
     async def get_comments_by_task_id(db: AsyncSession, task_id: int) -> Sequence[Row[Any] | RowMapping | Any]:
-        """получение комментариев по id задачи"""
-        result = await db.execute(select(Comment).where(task_id == Comment.task_id))
+        """Получение комментариев по id задачи"""
+        result = await db.execute(select(Comment).where(Comment.task_id == task_id))
         return result.scalars().all()
-    
 
-# Создаем экземпляры репозиториев
+
+# Экземпляры репозиториев
 calendar_repo = CalendarRepository()
 evaluation_repo = EvaluationRepository()
 task_repo = TaskRepository()
