@@ -10,65 +10,169 @@
         <div class="section">
         <!--    Блок со списком пользователей -->
             <h2>Список пользователей</h2>
-            {% if users: %}
-            <ul>
-                {% for user in users %}
-                <li>{{ user.id }} - {{ user.username }} ({{ user.email }})</li>
-                {% endfor %}
-            </ul>
-            {% else %}
-                <h3>Пользователи не добавлены</h3>
-            {% endif %}
+                {% if users: %}
+                    <table border="1">
+                        <tr align="center">
+                            <th>id</th>
+                            <th>username</th>
+                            <th>email</th>
+                            <th>is_active</th>
+                            <th>is_superuser</th>
+                            <th>is_verified</th>
+                            <th>role</th>
+                            <th>member_of_team</th>
+                            <th>created_at</th>
+                        </tr>
+                        {% for user in users %}
+                        <tr align="center">
+                            <td>{{ user.id }}</td>
+                            <td>{{ user.username }}</td>
+                            <td>{{ user.email }}</td>
+                            <td>{{ user.is_active }}</td>
+                            <td>{{ user.is_superuser }}</td>
+                            <td>{{ user.is_verified }}</td>
+                            <td>{{ user.role }}</td>
+                            <td>{{ user.member_of_team }}</td>
+                            <td>{{ user.created_at }}</td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                {% else %}
+                    <h3>Пользователи не добавлены</h3>
+                {% endif %}
+
+        <!--    Блок со списком команд -->
+            <h2>Команды</h2>
+                {% if teams: %}
+                    <table border="1">
+                        <tr align="center">
+                            <th>team_id</th>
+                            <th>team_name</th>
+                            <th>admin</th>
+                            <th>members</th>
+                            <th>invite_code</th>
+                            <th>created_at</th>
+                        </tr>
+                        {% for team in teams %}
+                        <tr align="center">
+                            <td>{{ team.team_id }}</td>
+                            <td>{{ team.team_name }}</td>
+                            <td>{{ team.admin }}</td>
+                            <td>{{ team.members }}</td>
+                            <td>{{ team.invite_code }}</td>
+                            <td>{{ team.created_at }}</td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                {% else %}
+                    <h3>Команды не созданы</h3>
+                {% endif %}
 
         <!--    Блок со списком задач -->
             <h2>Задачи</h2>
                 {% if tasks: %}
-            <ul>
-                {% for task in tasks %}
-                <li>{{ task.task_id }}</li>
-                {% endfor %}
-            </ul>
-            {% else %}
-                <h3>Задачи не поставлены</h3>
-            {% endif %}
-        <!--    Блок со списком команд -->
-            <h2>Команды</h2>
-                {% if teams: %}
-            <ul>
-                {% for team in teams %}
-                <li>{{ team.team_id }}</li>
-                {% endfor %}
-            </ul>
-            {% else %}
-                <h3>Команды не созданы</h3>
-            {% endif %}
+                    <table border="1">
+                        <tr align="center">
+                            <th>task_id</th>
+                            <th>task_name</th>
+                            <th>status</th>
+                            <th>executor</th>
+                            <th>checker</th>
+                            <th>team</th>
+                            <th>deadline</th>
+                            <th>evaluations</th>
+                        </tr>
+                        {% for task in tasks %}
+                        <tr align="center">
+                            <td>{{ task.task_id }}</td>
+                            <td>{{ task.task_name }}</td>
+                            <td>{{ task.status }}</td>
+                            <td>{{ task.executor }}</td>
+                            <td>{{ task.checker }}</td>
+                            <td>{{ task.team }}</td>
+                            <td>{{ task.deadline }}</td>
+                            <td>{{ task.evaluations }}</td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                {% else %}
+                    <h3>Задачи не поставлены</h3>
+                {% endif %}
 
         <!--    Блок со списком встреч -->
-        <!--    добавить отображение календаря -->
             <h2>Встречи</h2>
                 {% if meetings: %}
-            <ul>
-                {% for meeting in meetings %}
-                <li>{{ meeting.meeting_name }} - {{ meeting.meeting_admin }}</li>
+                    <table border="1">
+                        <tr align="center">
+                            <th>meeting_id</th>
+                            <th>meeting_name</th>
+                            <th>meeting_admin</th>
+                            <th>meeting_date</th>
+                            <th>duration_minutes</th>
+                        </tr>
+                        {% for meeting in meetings %}
+                        <tr align="center">
+                            <td>{{ meeting.meeting_id }}</td>
+                            <td>{{ meeting.meeting_name }}</td>
+                            <td>{{ meeting.meeting_admin }}</td>
+                            <td>{{ meeting.meeting_date }}</td>
+                            <td>{{ meeting.duration_minutes }}</td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                {% else %}
+                    <h3>Встречи не назначены</h3>
+                {% endif %}
+        </div>
+
+        <!-- Календарь текущего месяца -->
+        <div class="calendar">
+            <h2>Календарь</h2>
+            <table border="1">
+                <tr align="center">
+                    <th>Пн</th>
+                    <th>Вт</th>
+                    <th>Ср</th>
+                    <th>Чт</th>
+                    <th>Пт</th>
+                    <th>Сб</th>
+                    <th>Вс</th>
+                </tr>
+                {% for week in calendar_weeks %}
+                <tr align="center">
+                    {% for day in week %}
+                        {% if day.month != current_month %}
+                            <td width="100" height="wrap content" bgcolor="grey">
+                                {{ day.day }}.{{ day.month }}
+                            </td>
+
+                        {% elif day.is_today %}
+                            <td width="100" height="wrap content" bgcolor="green">
+                                {{ day.day }}.{{ day.month }}
+                            </td>
+
+                        {% else %}
+                            <td width="100" height="wrap content">
+                                {{ day.day }}.{{ day.month }}
+                                {% if day.has_meeting %}
+                                <div style="color: Green">
+                                    (Встреч: {{ day.meeting_count }})
+                                </div>
+                                {% endif %}
+                            </td>
+                        {% endif %}
+                    {% endfor %}
+                </tr>
                 {% endfor %}
-            </ul>
-            {% else %}
-                <h3>Встречи не назначены</h3>
-            {% endif %}
-
-<!--&lt;!&ndash;            Календарь&ndash;&gt;-->
-<!--            <h2>События календаря</h2>-->
-<!--                {% if calendar_repo: %}-->
-<!--            <ul>-->
-<!--                {% for event in calendar_repo.get_upcoming_events %}-->
-<!--                <li>{{ event }}</li>-->
-<!--                {% endfor %}-->
-<!--            </ul>-->
-<!--            {% else %}-->
-<!--                <h3>События в календаре отсутствуют</h3>-->
-<!--            {% endif %}-->
-
-
+            </table>
+        </div>
+        <div>
+            <p>
+                <a href="http://127.0.0.1:8000/admin">Админская панель</a>
+            </p>
+            <p>
+                <a href="http://127.0.0.1:8000/docs">Документация</a>
+            </p>
         </div>
     </body>
 </html>
