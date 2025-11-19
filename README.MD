@@ -48,25 +48,36 @@
 
 ```bash
 .
-├── app/
-│   ├── admin.py              # Админ-панель SQLAdmin
-│   ├── database/
-│   │   ├── database.py       # Конфигурация БД
-│   │   ├── models.py         # SQLAlchemy модели
-│   │   ├── repository.py     # Паттерн Repository
-│   │   └── __init__.py
-│   ├── dependencies.py       # Зависимости и проверки прав
-│   ├── routers/              # API роутеры
-│   │   ├── calendar.py       # Календарь и события
-│   │   ├── evaluations.py    # Система оценок
-│   │   ├── meetings.py       # Управление встречами
-│   │   ├── tasks.py          # Управление задачами
-│   │   ├── teams.py          # Управление командами
-│   │   └── users.py          # Пользователи и профиль
-│   ├── schemas.py            # Pydantic схемы
-│   └── fastapi_users.py      # FastAPI-users конфигурация
-├── main.py                   # Точка входа приложения
-└── requirements.txt          # Зависимости
+├── app
+│ ├── admin.py
+│ ├── database
+│ │ ├── database.py
+│ │ ├── __init__.py
+│ │ ├── models.py
+│ │ └── repository.py
+│ ├── dependencies.py
+│ ├── fastapi_users.py
+│ ├── __init__.py
+│ ├── routers
+│ │ ├── calendar.py
+│ │ ├── evaluations.py
+│ │ ├── index.py
+│ │ ├── __init__.py
+│ │ ├── meetings.py
+│ │ ├── tasks.py
+│ │ ├── teams.py
+│ │ └── users.py
+│ ├── schemas.py
+│ ├── services
+│ │ ├── calendar_service.py
+│ │ ├── database_error_handler.py
+│ └── templates
+│     └── index.html
+├── docker-compose.yaml
+├── Dockerfile
+├── main.py
+├── README.MD
+└── requirements.txt
 ```
 
 ### Используемые паттерны
@@ -108,7 +119,7 @@ pip install -r requirements.txt
 # Database
 DB_NAME=name
 DB_HOST=host
-DB_PORT=port
+DB_PORT=port #5432 для PostgreSQL
 DB_USER=user
 DB_PASS=password
 
