@@ -66,12 +66,22 @@ async def get_evaluations(
     evaluations = await evaluation_repo.get_evaluations_by_filters(db, skip, limit, task_id, user_id)
 
     # проверка прав доступа
-    if current_user.role not in [RoleEnum.admin, RoleEnum.team_admin, RoleEnum.manager]:
-        evaluations = [evaluation for evaluation in evaluations if
-                       evaluation.task.task_executor == current_user.id or
-                       evaluation.task.task_checker == current_user.id]
-        return [EvaluationRead.model_validate(ev) for ev in evaluations]
-    return None
+    if current_user.role in [RoleEnum.admin, RoleEnum.team_admin, RoleEnum.manager]:
+        user_evaluations = evaluations
+    else:
+        user_evaluations = [
+            evaluation for evaluation in evaluations
+            if (evaluation.task.task_executor == current_user.id or
+                evaluation.task.task_checker == current_user.id)
+        ]
+
+    if not user_evaluations:
+        if current_user.role in [RoleEnum.admin, RoleEnum.team_admin, RoleEnum.manager]:
+            raise HTTPException(status_code=404, detail="У вас нет задач для оценивания")
+        else:
+            raise HTTPException(status_code=404, detail="У вас нет оценок")
+
+    return [EvaluationRead.model_validate(ev) for ev in user_evaluations]
 
 
 @router.get("/my-evaluations", response_model=List[EvaluationRead])
